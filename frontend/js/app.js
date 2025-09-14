@@ -1,7 +1,8 @@
 // Rice Supply Chain Management System - Frontend JavaScript
 
 // Configuration
-const API_BASE_URL = 'http://localhost:3000/api';
+// Dynamic API base URL that works for both local development and deployed environments
+const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api`;
 
 // Global variables
 let currentSection = 'dashboard';
