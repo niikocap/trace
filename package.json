@@ -1,0 +1,15 @@
+{
+  "name": "rice-supply-chain",
+  "version": "1.0.0",
+  "description": "Rice Supply Chain Management System with Blockchain Integration",
+  "main": "index.js",
+  "scripts": {
+    "dev": "cd backend && npm run dev",
+    "build": "cd solana-program && anchor build",
+    "test": "cd solana-program && anchor test",
+    "deploy": "cd solana-program && anchor deploy"
+  },
+  "keywords": ["rice", "supply-chain", "blockchain", "solana"],
+  "author": "DigiSaka",
+  "license": "MIT"
+}
