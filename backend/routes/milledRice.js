@@ -8,21 +8,33 @@ database.connect();
 // GET /api/milled-rice - Get all milled rice records
 router.get('/', async (req, res) => {
     try {
-        const milledRice = await database.all(`
-            SELECT mr.*, ca.name as miller_name, rb.batch_number
-            FROM milled_rice mr
-            LEFT JOIN chain_actors ca ON mr.miller_id = ca.id
-            LEFT JOIN rice_batches rb ON mr.batch_id = rb.id
-            ORDER BY mr.milling_date DESC
-        `);
+        const { data: milledRice, error } = await database.supabase
+            .from('milled_rice')
+            .select(`
+                *,
+                rice_batch:rice_batches!batch_id(batch_number),
+                miller:chain_actors!miller_id(name)
+            `)
+            .order('milling_date', { ascending: false });
+
+        if (error) {
+            throw error;
+        }
+
+        // Transform the data to match expected format
+        const transformedData = milledRice?.map(rice => ({
+            ...rice,
+            batch_number: rice.rice_batch?.batch_number || null,
+            miller_name: rice.miller?.name || null
+        })) || [];
         
         res.json({
             success: true,
-            data: milledRice,
-            count: milledRice.length
+            data: transformedData,
+            count: transformedData.length
         });
     } catch (error) {
-        console.error('Error fetching milled rice records:', error);
+        console.error('Error fetching milled rice:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to fetch milled rice records',

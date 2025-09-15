@@ -8,11 +8,19 @@ database.connect();
 // GET /api/chain-actors - Get all chain actors
 router.get('/', async (req, res) => {
     try {
-        const actors = await database.all('chain_actors', {}, { column: 'created_at', ascending: false });
+        const { data: actors, error } = await database.supabase
+            .from('chain_actors')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (error) {
+            throw error;
+        }
+
         res.json({
             success: true,
-            data: actors,
-            count: actors.length
+            data: actors || [],
+            count: actors?.length || 0
         });
     } catch (error) {
         console.error('Error fetching chain actors:', error);

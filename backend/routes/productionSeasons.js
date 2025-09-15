@@ -8,11 +8,19 @@ database.connect();
 // GET /api/production-seasons - Get all production seasons
 router.get('/', async (req, res) => {
     try {
-        const seasons = await database.all('SELECT * FROM production_seasons ORDER BY start_date DESC');
+        const { data: seasons, error } = await database.supabase
+            .from('production_seasons')
+            .select('*')
+            .order('start_date', { ascending: false });
+
+        if (error) {
+            throw error;
+        }
+
         res.json({
             success: true,
-            data: seasons,
-            count: seasons.length
+            data: seasons || [],
+            count: seasons?.length || 0
         });
     } catch (error) {
         console.error('Error fetching production seasons:', error);
@@ -28,13 +36,20 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const season = await database.get('SELECT * FROM production_seasons WHERE id = ?', [id]);
-        
-        if (!season) {
-            return res.status(404).json({
-                success: false,
-                error: 'Production season not found'
-            });
+        const { data: season, error } = await database.supabase
+            .from('production_seasons')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Production season not found'
+                });
+            }
+            throw error;
         }
         
         res.json({
