@@ -8,7 +8,7 @@ database.connect();
 // GET /api/chain-actors - Get all chain actors
 router.get('/', async (req, res) => {
     try {
-        const actors = await database.all('SELECT * FROM chain_actors ORDER BY created_at DESC');
+        const actors = await database.all('chain_actors', {}, { column: 'created_at', ascending: false });
         res.json({
             success: true,
             data: actors,
@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const actor = await database.get('SELECT * FROM chain_actors WHERE id = ?', [id]);
+        const actor = await database.get('chain_actors', { id });
         
         if (!actor) {
             return res.status(404).json({
@@ -87,13 +87,16 @@ router.post('/', async (req, res) => {
             }
         }
         
-        const result = await database.run(
-            `INSERT INTO chain_actors (name, type, location, \`group\`, farmer_id, assign_tps, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-            [name, typeToStore, location || null, group || null, farmer_id || null, assign_tps || null]
-        );
+        const result = await database.insert('chain_actors', {
+            name,
+            type: typeToStore,
+            location: location || null,
+            group: group || null,
+            farmer_id: farmer_id || null,
+            assign_tps: assign_tps || null
+        });
         
-        const newActor = await database.get('SELECT * FROM chain_actors WHERE id = ?', [result.id]);
+        const newActor = await database.get('chain_actors', { id: result.id });
         
         res.status(201).json({
             success: true,
@@ -150,20 +153,17 @@ router.put('/:id', async (req, res) => {
             }
         }
         
-        await database.run(
-            `UPDATE chain_actors 
-             SET name = COALESCE(?, name),
-                 type = COALESCE(?, type),
-                 location = COALESCE(?, location),
-                 \`group\` = COALESCE(?, \`group\`),
-                 farmer_id = COALESCE(?, farmer_id),
-                 assign_tps = COALESCE(?, assign_tps),
-                 updated_at = datetime('now')
-             WHERE id = ?`,
-            [name, typeToStore, location, group, farmer_id, assign_tps, id]
-        );
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (typeToStore !== undefined) updateData.type = typeToStore;
+        if (location !== undefined) updateData.location = location;
+        if (group !== undefined) updateData.group = group;
+        if (farmer_id !== undefined) updateData.farmer_id = farmer_id;
+        if (assign_tps !== undefined) updateData.assign_tps = assign_tps;
         
-        const updatedActor = await database.get('SELECT * FROM chain_actors WHERE id = ?', [id]);
+        await database.update('chain_actors', id, updateData);
+        
+        const updatedActor = await database.get('chain_actors', { id });
         
         res.json({
             success: true,
@@ -187,7 +187,7 @@ router.delete('/:id', async (req, res) => {
         const { id } = req.params;
         
         // Check if actor exists
-        const existingActor = await database.get('SELECT * FROM chain_actors WHERE id = ?', [id]);
+        const existingActor = await database.get('chain_actors', { id });
         if (!existingActor) {
             return res.status(404).json({
                 success: false,
@@ -196,17 +196,17 @@ router.delete('/:id', async (req, res) => {
         }
         
         // Check for dependencies
-        const riceBatches = await database.get('SELECT COUNT(*) as count FROM rice_batches WHERE farmer_id = ?', [id]);
-        const milledRice = await database.get('SELECT COUNT(*) as count FROM milled_rice WHERE miller_id = ?', [id]);
+        const riceBatches = await database.all('rice_batches', { farmer_id: id });
+        const milledRice = await database.all('milled_rice', { miller_id: id });
         
-        if (riceBatches.count > 0 || milledRice.count > 0) {
+        if (riceBatches.length > 0 || milledRice.length > 0) {
             return res.status(400).json({
                 success: false,
                 error: 'Cannot delete chain actor with existing dependencies (rice batches or milled rice records)'
             });
         }
         
-        await database.run('DELETE FROM chain_actors WHERE id = ?', [id]);
+        await database.delete('chain_actors', id);
         
         res.json({
             success: true,
@@ -236,10 +236,7 @@ router.get('/type/:type', async (req, res) => {
             });
         }
         
-        const actors = await database.all(
-            'SELECT * FROM chain_actors WHERE type = ? ORDER BY created_at DESC',
-            [type]
-        );
+        const actors = await database.all('chain_actors', { type }, { column: 'created_at', ascending: false });
         
         res.json({
             success: true,
