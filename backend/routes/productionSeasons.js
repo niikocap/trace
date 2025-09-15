@@ -106,24 +106,24 @@ router.post('/', async (req, res) => {
             });
         }
         
-        const result = await database.run(
-            `INSERT INTO production_seasons (
-                season_name, start_date, end_date, variety, carbon_certified,
-                fertilizer_used, pesticide_used, farmer_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-            [
+        const { data: newSeason, error: insertError } = await database.supabase
+            .from('production_seasons')
+            .insert({
                 season_name,
-                planting_date,
-                harvesting_date,
-                variety || null,
-                carbon_certified || 0,
-                Array.isArray(fertilizer_used) ? fertilizer_used.join(',') : fertilizer_used || null,
-                Array.isArray(pesticide_used) ? pesticide_used.join(',') : pesticide_used || null,
-                farmer_id || null
-            ]
-        );
-        
-        const newSeason = await database.get('SELECT * FROM production_seasons WHERE id = ?', [result.id]);
+                start_date: planting_date,
+                end_date: harvesting_date,
+                variety: variety || null,
+                carbon_certified: carbon_certified || false,
+                fertilizer_used: Array.isArray(fertilizer_used) ? fertilizer_used.join(',') : fertilizer_used || null,
+                pesticide_used: Array.isArray(pesticide_used) ? pesticide_used.join(',') : pesticide_used || null,
+                farmer_id: farmer_id || null
+            })
+            .select()
+            .single();
+
+        if (insertError) {
+            throw insertError;
+        }
         
         res.status(201).json({
             success: true,
@@ -184,30 +184,33 @@ router.put('/:id', async (req, res) => {
             }
         }
         
-        await database.run(
-            `UPDATE production_seasons 
-             SET season_name = COALESCE(?, season_name),
-                 start_date = COALESCE(?, start_date),
-                 end_date = COALESCE(?, end_date),
-                 expected_yield = COALESCE(?, expected_yield),
-                 actual_yield = COALESCE(?, actual_yield),
-                 weather_conditions = COALESCE(?, weather_conditions),
-                 notes = COALESCE(?, notes),
-                 updated_at = datetime('now')
-             WHERE id = ?`,
-            [
-                season_name,
-                start_date,
-                end_date,
-                expected_yield,
-                actual_yield,
-                weather_conditions,
-                notes,
-                id
-            ]
-        );
+        const updateData = {};
+        if (season_name !== undefined) updateData.season_name = season_name;
+        if (start_date !== undefined) updateData.start_date = start_date;
+        if (end_date !== undefined) updateData.end_date = end_date;
+        if (expected_yield !== undefined) updateData.expected_yield = expected_yield;
+        if (actual_yield !== undefined) updateData.actual_yield = actual_yield;
+        if (weather_conditions !== undefined) updateData.weather_conditions = weather_conditions;
+        if (notes !== undefined) updateData.notes = notes;
+
+        const { error: updateError } = await database.supabase
+            .from('production_seasons')
+            .update(updateData)
+            .eq('id', id);
+
+        if (updateError) {
+            throw updateError;
+        }
         
-        const updatedSeason = await database.get('SELECT * FROM production_seasons WHERE id = ?', [id]);
+        const { data: updatedSeason, error: fetchError } = await database.supabase
+            .from('production_seasons')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) {
+            throw fetchError;
+        }
         
         res.json({
             success: true,
@@ -252,7 +255,14 @@ router.delete('/:id', async (req, res) => {
             });
         }
         
-        await database.run('DELETE FROM production_seasons WHERE id = ?', [id]);
+        const { error: deleteError } = await database.supabase
+            .from('production_seasons')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) {
+            throw deleteError;
+        }
         
         res.json({
             success: true,

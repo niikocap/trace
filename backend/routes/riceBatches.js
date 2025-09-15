@@ -359,48 +359,52 @@ router.put('/:id', async (req, res) => {
             }
         }
         
-        await database.run(
-            `UPDATE rice_batches 
-             SET batch_number = COALESCE(?, batch_number),
-                 farmer_id = COALESCE(?, farmer_id),
-                 production_season_id = COALESCE(?, production_season_id),
-                 rice_variety = COALESCE(?, rice_variety),
-                 planting_date = COALESCE(?, planting_date),
-                 harvest_date = COALESCE(?, harvest_date),
-                 quantity_harvested = COALESCE(?, quantity_harvested),
-                 quality_grade = COALESCE(?, quality_grade),
-                 farming_practices = COALESCE(?, farming_practices),
-                 certifications = COALESCE(?, certifications),
-                 storage_conditions = COALESCE(?, storage_conditions),
-                 updated_at = datetime('now')
-             WHERE id = ?`,
-            [
-                batch_number,
-                farmer_id,
-                production_season_id,
-                rice_variety,
-                planting_date,
-                harvest_date,
-                quantity_harvested,
-                quality_grade,
-                farming_practices,
-                certifications,
-                storage_conditions,
-                id
-            ]
-        );
+        const updateData = {};
+        if (batch_number !== undefined) updateData.batch_number = batch_number;
+        if (farmer_id !== undefined) updateData.farmer_id = farmer_id;
+        if (production_season_id !== undefined) updateData.production_season_id = production_season_id;
+        if (rice_variety !== undefined) updateData.rice_variety = rice_variety;
+        if (planting_date !== undefined) updateData.planting_date = planting_date;
+        if (harvest_date !== undefined) updateData.harvest_date = harvest_date;
+        if (quantity_harvested !== undefined) updateData.quantity_harvested = quantity_harvested;
+        if (quality_grade !== undefined) updateData.quality_grade = quality_grade;
+        if (farming_practices !== undefined) updateData.farming_practices = farming_practices;
+        if (certifications !== undefined) updateData.certifications = certifications;
+        if (storage_conditions !== undefined) updateData.storage_conditions = storage_conditions;
+
+        const { error: updateError } = await database.supabase
+            .from('rice_batches')
+            .update(updateData)
+            .eq('id', id);
+
+        if (updateError) {
+            throw updateError;
+        }
         
-        const updatedBatch = await database.get(`
-            SELECT rb.*, ca.name as farmer_name, ps.season_name
-            FROM rice_batches rb
-            LEFT JOIN chain_actors ca ON rb.farmer_id = ca.id
-            LEFT JOIN production_seasons ps ON rb.production_season_id = ps.id
-            WHERE rb.id = ?
-        `, [id]);
+        const { data: updatedBatch, error: fetchError } = await database.supabase
+            .from('rice_batches')
+            .select(`
+                *,
+                farmer:chain_actors!farmer_id(name),
+                production_season:production_seasons!production_season_id(season_name)
+            `)
+            .eq('id', id)
+            .single();
+
+        if (fetchError) {
+            throw fetchError;
+        }
+
+        // Transform the data to match expected format
+        const transformedData = {
+            ...updatedBatch,
+            farmer_name: updatedBatch.farmer?.name || null,
+            season_name: updatedBatch.production_season?.season_name || null
+        };
         
         res.json({
             success: true,
-            data: updatedBatch,
+            data: transformedData,
             message: 'Rice batch updated successfully'
         });
         
@@ -437,7 +441,14 @@ router.delete('/:id', async (req, res) => {
             });
         }
         
-        await database.run('DELETE FROM rice_batches WHERE id = ?', [id]);
+        const { error: deleteError } = await database.supabase
+            .from('rice_batches')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) {
+            throw deleteError;
+        }
         
         res.json({
             success: true,

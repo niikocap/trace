@@ -47,24 +47,36 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const milledRice = await database.get(`
-            SELECT mr.*, ca.name as miller_name, rb.batch_number
-            FROM milled_rice mr
-            LEFT JOIN chain_actors ca ON mr.miller_id = ca.id
-            LEFT JOIN rice_batches rb ON mr.batch_id = rb.id
-            WHERE mr.id = ?
-        `, [id]);
-        
-        if (!milledRice) {
-            return res.status(404).json({
-                success: false,
-                error: 'Milled rice record not found'
-            });
+        const { data: milledRice, error } = await database.supabase
+            .from('milled_rice')
+            .select(`
+                *,
+                miller:chain_actors!miller_id(name),
+                rice_batch:rice_batches!batch_id(batch_number)
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Milled rice record not found'
+                });
+            }
+            throw error;
         }
+
+        // Transform the data to match expected format
+        const transformedData = {
+            ...milledRice,
+            miller_name: milledRice.miller?.name || null,
+            batch_number: milledRice.rice_batch?.batch_number || null
+        };
         
         res.json({
             success: true,
-            data: milledRice
+            data: transformedData
         });
     } catch (error) {
         console.error('Error fetching milled rice record:', error);
@@ -103,7 +115,12 @@ router.post('/', async (req, res) => {
         }
         
         // Validate foreign key constraints
-        const batch = await database.get('SELECT * FROM rice_batches WHERE id = ?', [batch_id]);
+        const { data: batch } = await database.supabase
+            .from('rice_batches')
+            .select('id')
+            .eq('id', batch_id)
+            .single();
+            
         if (!batch) {
             return res.status(400).json({
                 success: false,
@@ -111,7 +128,13 @@ router.post('/', async (req, res) => {
             });
         }
         
-        const miller = await database.get('SELECT * FROM chain_actors WHERE id = ? AND type = "miller"', [miller_id]);
+        const { data: miller } = await database.supabase
+            .from('chain_actors')
+            .select('id')
+            .eq('id', miller_id)
+            .eq('type', 'miller')
+            .single();
+            
         if (!miller) {
             return res.status(400).json({
                 success: false,
@@ -147,40 +170,42 @@ router.post('/', async (req, res) => {
         // Calculate milling yield percentage if not provided
         const yieldPercentage = milling_yield_percentage || ((outputQty / inputQty) * 100).toFixed(2);
         
-        const result = await database.run(
-            `INSERT INTO milled_rice (
-                batch_id, rice_variety, grade, milling_date, miller_id,
-                input_quantity, output_quantity, quality, machine,
-                milling_yield_percentage, quality_parameters,
-                storage_location, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-            [
+        const { data: newMilledRice, error: insertError } = await database.supabase
+            .from('milled_rice')
+            .insert({
                 batch_id,
                 rice_variety,
-                grade || null,
+                grade: grade || null,
                 milling_date,
                 miller_id,
                 input_quantity,
                 output_quantity,
-                quality || null,
-                machine || null,
-                yieldPercentage,
-                quality_parameters || null,
-                storage_location || null
-            ]
-        );
+                quality: quality || null,
+                machine: machine || null,
+                milling_yield_percentage: yieldPercentage,
+                storage_location: storage_location || null
+            })
+            .select(`
+                *,
+                rice_batch:rice_batches!batch_id(batch_number),
+                miller:chain_actors!miller_id(name)
+            `)
+            .single();
+
+        if (insertError) {
+            throw insertError;
+        }
         
-        const newMilledRice = await database.get(`
-            SELECT mr.*, ca.name as miller_name, rb.batch_number
-            FROM milled_rice mr
-            LEFT JOIN chain_actors ca ON mr.miller_id = ca.id
-            LEFT JOIN rice_batches rb ON mr.batch_id = rb.id
-            WHERE mr.id = ?
-        `, [result.id]);
+        // Transform the data to match expected format
+        const transformedData = {
+            ...newMilledRice,
+            batch_number: newMilledRice.rice_batch?.batch_number || null,
+            miller_name: newMilledRice.miller?.name || null
+        };
         
         res.status(201).json({
             success: true,
-            data: newMilledRice,
+            data: transformedData,
             message: 'Milled rice record created successfully'
         });
         
@@ -221,7 +246,12 @@ router.put('/:id', async (req, res) => {
         
         // Validate foreign key constraints if provided
         if (batch_id) {
-            const batch = await database.get('SELECT * FROM rice_batches WHERE id = ?', [batch_id]);
+            const { data: batch } = await database.supabase
+                .from('rice_batches')
+                .select('id')
+                .eq('id', batch_id)
+                .single();
+                
             if (!batch) {
                 return res.status(400).json({
                     success: false,
@@ -231,7 +261,13 @@ router.put('/:id', async (req, res) => {
         }
         
         if (miller_id) {
-            const miller = await database.get('SELECT * FROM chain_actors WHERE id = ? AND type = "miller"', [miller_id]);
+            const { data: miller } = await database.supabase
+                .from('chain_actors')
+                .select('id')
+                .eq('id', miller_id)
+                .eq('type', 'miller')
+                .single();
+                
             if (!miller) {
                 return res.status(400).json({
                     success: false,
@@ -257,49 +293,66 @@ router.put('/:id', async (req, res) => {
             if (isNaN(quantity) || quantity <= 0) {
                 return res.status(400).json({
                     success: false,
-                    error: 'quantity_milled must be a positive number'
+                    error: 'input_quantity must be a positive number'
+                });
+            }
+        }
+        if (output_quantity !== undefined) {
+            const outputQty = parseFloat(output_quantity);
+            if (isNaN(outputQty) || outputQty <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'output_quantity must be a positive number'
                 });
             }
         }
         
-        await database.run(
-            `UPDATE milled_rice 
-             SET batch_id = COALESCE(?, batch_id),
-                 rice_variety = COALESCE(?, rice_variety),
-                 grade = COALESCE(?, grade),
-                 milling_date = COALESCE(?, milling_date),
-                 miller_id = COALESCE(?, miller_id),
-                 quantity_milled = COALESCE(?, quantity_milled),
-                 milling_yield_percentage = COALESCE(?, milling_yield_percentage),
-                 quality_parameters = COALESCE(?, quality_parameters),
-                 storage_location = COALESCE(?, storage_location),
-                 updated_at = datetime('now')
-             WHERE id = ?`,
-            [
-                batch_id,
-                rice_variety,
-                grade,
-                milling_date,
-                miller_id,
-                quantity_milled,
-                milling_yield_percentage,
-                quality_parameters,
-                storage_location,
-                id
-            ]
-        );
+        const updateData = {};
+        if (batch_id !== undefined) updateData.batch_id = batch_id;
+        if (rice_variety !== undefined) updateData.rice_variety = rice_variety;
+        if (grade !== undefined) updateData.grade = grade;
+        if (milling_date !== undefined) updateData.milling_date = milling_date;
+        if (miller_id !== undefined) updateData.miller_id = miller_id;
+        if (input_quantity !== undefined) updateData.input_quantity = input_quantity;
+        if (output_quantity !== undefined) updateData.output_quantity = output_quantity;
+        if (quality !== undefined) updateData.quality = quality;
+        if (machine !== undefined) updateData.machine = machine;
+        if (milling_yield_percentage !== undefined) updateData.milling_yield_percentage = milling_yield_percentage;
+        if (storage_location !== undefined) updateData.storage_location = storage_location;
+
+        const { error: updateError } = await database.supabase
+            .from('milled_rice')
+            .update(updateData)
+            .eq('id', id);
+
+        if (updateError) {
+            throw updateError;
+        }
         
-        const updatedRecord = await database.get(`
-            SELECT mr.*, ca.name as miller_name, rb.batch_number
-            FROM milled_rice mr
-            LEFT JOIN chain_actors ca ON mr.miller_id = ca.id
-            LEFT JOIN rice_batches rb ON mr.batch_id = rb.id
-            WHERE mr.id = ?
-        `, [id]);
+        const { data: updatedRecord, error: fetchError } = await database.supabase
+            .from('milled_rice')
+            .select(`
+                *,
+                miller:chain_actors!miller_id(name),
+                rice_batch:rice_batches!batch_id(batch_number)
+            `)
+            .eq('id', id)
+            .single();
+
+        if (fetchError) {
+            throw fetchError;
+        }
+
+        // Transform the data to match expected format
+        const transformedData = {
+            ...updatedRecord,
+            miller_name: updatedRecord.miller?.name || null,
+            batch_number: updatedRecord.rice_batch?.batch_number || null
+        };
         
         res.json({
             success: true,
-            data: updatedRecord,
+            data: transformedData,
             message: 'Milled rice record updated successfully'
         });
         
@@ -327,7 +380,14 @@ router.delete('/:id', async (req, res) => {
             });
         }
         
-        await database.run('DELETE FROM milled_rice WHERE id = ?', [id]);
+        const { error: deleteError } = await database.supabase
+            .from('milled_rice')
+            .delete()
+            .eq('id', id);
+
+        if (deleteError) {
+            throw deleteError;
+        }
         
         res.json({
             success: true,
