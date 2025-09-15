@@ -51,11 +51,24 @@ class SolanaService {
     
     async createRealTransaction(transactionData) {
         try {
-            // Load wallet keypair
-            const walletPath = path.join(process.env.HOME, '.config/solana/id.json');
-            const walletKeypair = Keypair.fromSecretKey(
-                Uint8Array.from(JSON.parse(fs.readFileSync(walletPath, 'utf8')))
-            );
+            // Load wallet keypair from environment variable or local file
+            let walletKeypair;
+            
+            if (process.env.SOLANA_PRIVATE_KEY) {
+                // Production: Use environment variable
+                const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
+                walletKeypair = Keypair.fromSecretKey(Uint8Array.from(privateKeyArray));
+            } else {
+                // Development: Use local file
+                const walletPath = path.join(process.env.HOME || '/tmp', '.config/solana/id.json');
+                if (fs.existsSync(walletPath)) {
+                    walletKeypair = Keypair.fromSecretKey(
+                        Uint8Array.from(JSON.parse(fs.readFileSync(walletPath, 'utf8')))
+                    );
+                } else {
+                    throw new Error('No wallet keypair found. Set SOLANA_PRIVATE_KEY environment variable or ensure ~/.config/solana/id.json exists');
+                }
+            }
             
             // Get PDA for transaction
             const [transactionPDA] = await PublicKey.findProgramAddress(
