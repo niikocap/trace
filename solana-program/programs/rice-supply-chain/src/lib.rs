@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use serde::{Deserialize, Serialize};
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("FS1fWouL7tpGRTErvRcdcWpgU2BsSuTfbEpEDBufWF1N");
 
 #[program]
 pub mod rice_supply_chain {

@@ -54,7 +54,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/chain-actors - Create chain actor
 router.post('/', async (req, res) => {
     try {
-        const { name, type, contact_info, location, certification_details } = req.body;
+        const { name, type, location, group, farmer_id, assign_tps } = req.body;
         
         // Validate required fields
         if (!name || !type) {
@@ -64,19 +64,33 @@ router.post('/', async (req, res) => {
             });
         }
         
-        // Validate type enum
-        const validTypes = ['farmer', 'miller', 'distributor', 'retailer'];
-        if (!validTypes.includes(type)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid type. Must be one of: farmer, miller, distributor, retailer'
-            });
+        // Validate type enum (can be array or string)
+        const validTypes = ['farmer', 'miller', 'distributor', 'retailer', 'validator'];
+        let typeToStore = type;
+        
+        if (Array.isArray(type)) {
+            // Check if all types in array are valid
+            const invalidTypes = type.filter(t => !validTypes.includes(t));
+            if (invalidTypes.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Invalid type(s): ${invalidTypes.join(', ')}. Must be one of: farmer, miller, distributor, retailer, validator`
+                });
+            }
+            typeToStore = type.join(',');
+        } else {
+            if (!validTypes.includes(type)) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid type. Must be one of: farmer, miller, distributor, retailer, validator'
+                });
+            }
         }
         
         const result = await database.run(
-            `INSERT INTO chain_actors (name, type, contact_info, location, certification_details, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-            [name, type, contact_info || null, location || null, certification_details || null]
+            `INSERT INTO chain_actors (name, type, location, \`group\`, farmer_id, assign_tps, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+            [name, typeToStore, location || null, group || null, farmer_id || null, assign_tps || null]
         );
         
         const newActor = await database.get('SELECT * FROM chain_actors WHERE id = ?', [result.id]);
@@ -113,13 +127,26 @@ router.put('/:id', async (req, res) => {
         }
         
         // Validate type enum if provided
+        let typeToStore = type;
         if (type) {
-            const validTypes = ['farmer', 'miller', 'distributor', 'retailer'];
-            if (!validTypes.includes(type)) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid type. Must be one of: farmer, miller, distributor, retailer'
-                });
+            const validTypes = ['farmer', 'miller', 'distributor', 'retailer', 'validator'];
+            
+            if (Array.isArray(type)) {
+                const invalidTypes = type.filter(t => !validTypes.includes(t));
+                if (invalidTypes.length > 0) {
+                    return res.status(400).json({
+                        success: false,
+                        error: `Invalid type(s): ${invalidTypes.join(', ')}. Must be one of: farmer, miller, distributor, retailer, validator`
+                    });
+                }
+                typeToStore = type.join(',');
+            } else {
+                if (!validTypes.includes(type)) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'Invalid type. Must be one of: farmer, miller, distributor, retailer, validator'
+                    });
+                }
             }
         }
         
@@ -127,12 +154,13 @@ router.put('/:id', async (req, res) => {
             `UPDATE chain_actors 
              SET name = COALESCE(?, name),
                  type = COALESCE(?, type),
-                 contact_info = COALESCE(?, contact_info),
                  location = COALESCE(?, location),
-                 certification_details = COALESCE(?, certification_details),
+                 \`group\` = COALESCE(?, \`group\`),
+                 farmer_id = COALESCE(?, farmer_id),
+                 assign_tps = COALESCE(?, assign_tps),
                  updated_at = datetime('now')
              WHERE id = ?`,
-            [name, type, contact_info, location, certification_details, id]
+            [name, typeToStore, location, group, farmer_id, assign_tps, id]
         );
         
         const updatedActor = await database.get('SELECT * FROM chain_actors WHERE id = ?', [id]);

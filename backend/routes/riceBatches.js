@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const database = require('../config/database');
+const { v4: uuidv4 } = require('uuid');
 
 // Initialize database connection
 database.connect();
@@ -72,6 +73,9 @@ router.post('/', async (req, res) => {
             farmer_id,
             production_season_id,
             rice_variety,
+            milling_id,
+            validator_id,
+            dryer,
             planting_date,
             harvest_date,
             quantity_harvested,
@@ -81,16 +85,23 @@ router.post('/', async (req, res) => {
             storage_conditions
         } = req.body;
         
+        // Generate auto UUID for batch_id and QR code
+        const batch_id = uuidv4();
+        const qr_code = batch_id; // Use UUID as QR code identifier
+        
+        // Auto-generate batch_number if not provided
+        const finalBatchNumber = batch_number || `BATCH-${Date.now()}`;
+        
         // Validate required fields
-        if (!batch_number || !farmer_id || !production_season_id || !rice_variety) {
+        if (!farmer_id || !production_season_id || !rice_variety) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields: batch_number, farmer_id, production_season_id, rice_variety'
+                error: 'Missing required fields: farmer_id, production_season_id, rice_variety'
             });
         }
         
         // Check for unique batch number
-        const existingBatch = await database.get('SELECT * FROM rice_batches WHERE batch_number = ?', [batch_number]);
+        const existingBatch = await database.get('SELECT * FROM rice_batches WHERE batch_number = ?', [finalBatchNumber]);
         if (existingBatch) {
             return res.status(400).json({
                 success: false,
@@ -157,16 +168,20 @@ router.post('/', async (req, res) => {
         
         const result = await database.run(
             `INSERT INTO rice_batches (
-                batch_number, farmer_id, production_season_id, rice_variety,
-                planting_date, harvest_date, quantity_harvested, quality_grade,
-                farming_practices, certifications, storage_conditions,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+                batch_id, batch_number, farmer_id, production_season_id, rice_variety,
+                milling_id, validator_id, dryer, planting_date, harvest_date, 
+                quantity_harvested, quality_grade, farming_practices, certifications, 
+                storage_conditions, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
             [
-                batch_number,
+                batch_id,
+                finalBatchNumber,
                 farmer_id,
                 production_season_id,
                 rice_variety,
+                milling_id || null,
+                validator_id || null,
+                dryer || null,
                 planting_date || null,
                 harvest_date || null,
                 quantity_harvested || null,

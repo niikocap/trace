@@ -9,7 +9,15 @@
     "test": "cd solana-program && anchor test",
     "deploy": "cd solana-program && anchor deploy"
   },
-  "keywords": ["rice", "supply-chain", "blockchain", "solana"],
+  "keywords": [
+    "rice",
+    "supply-chain",
+    "blockchain",
+    "solana"
+  ],
   "author": "DigiSaka",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4"
+  }
 }

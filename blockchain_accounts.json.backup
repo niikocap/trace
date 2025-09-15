@@ -1,0 +1,68 @@
+[
+  {
+    "publicKey": "8LtfjbUMJP285V3zBHx4L9WXAkp2VKBs19L2ZChQa3X1",
+    "data": {
+      "transaction_id": "REAL001",
+      "transaction_type": "purchase",
+      "from_actor_id": 1,
+      "to_actor_id": 2,
+      "batch_ids": [
+        1
+      ],
+      "quantity": "1000",
+      "unit_price": "2.50",
+      "total_amount": "2500.00",
+      "payment_reference": [
+        "REAL_PAY001"
+      ],
+      "transaction_date": "2025-09-15T03:16:59.472Z",
+      "status": "completed",
+      "notes": "Real blockchain rice purchase"
+    },
+    "signature": "3qJdinSsoeoS1eJYr7rudM7eY9mGGvJ4yLGZ3SPzemh6XWE2Du4binwDp8mTU86gzt7THZw2XgTs1tgEgvXpdUYd"
+  },
+  {
+    "publicKey": "EUCKemwzeHGZpDh5buGqTFCyxhVsUXAamuepi9yV3inE",
+    "data": {
+      "transaction_id": "REAL002",
+      "transaction_type": "processing",
+      "from_actor_id": 2,
+      "to_actor_id": 3,
+      "batch_ids": [
+        1
+      ],
+      "quantity": "950",
+      "unit_price": "3.00",
+      "total_amount": "2850.00",
+      "payment_reference": [
+        "REAL_PAY002"
+      ],
+      "transaction_date": "2025-09-15T03:16:59.472Z",
+      "status": "completed",
+      "notes": "Real blockchain rice processing"
+    },
+    "signature": "3YJrAHzYUkF6i8t9ZHkvhVQndjitaE8joxRseypakosFQSUp8sjpKGTNpuPa97sUgmk15WUz7JFW1ZMiQfMkM3Bp"
+  },
+  {
+    "publicKey": "J3VtfdDMysTw2Fh3KG9vUEVrVXqhKW7Zji11j18KM3H1",
+    "data": {
+      "transaction_id": "REAL003",
+      "transaction_type": "distribution",
+      "from_actor_id": 3,
+      "to_actor_id": 4,
+      "batch_ids": [
+        2
+      ],
+      "quantity": "500",
+      "unit_price": "4.50",
+      "total_amount": "2250.00",
+      "payment_reference": [
+        "REAL_PAY003"
+      ],
+      "transaction_date": "2025-09-15T03:16:59.472Z",
+      "status": "completed",
+      "notes": "Real blockchain rice distribution"
+    },
+    "signature": "2F85yhjAeRDyEW9upbz8pKMVbZt199GpuFYxJRCxCsUoav59JrkTnTVjXimgXRB7uotdw1edkxk8QDT1SmnQPEWf"
+  }
+]

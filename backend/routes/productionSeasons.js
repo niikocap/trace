@@ -56,53 +56,55 @@ router.post('/', async (req, res) => {
     try {
         const {
             season_name,
-            start_date,
-            end_date,
-            expected_yield,
-            actual_yield,
-            weather_conditions,
-            notes
+            planting_date,
+            harvesting_date,
+            variety,
+            carbon_certified,
+            fertilizer_used,
+            pesticide_used,
+            farmer_id
         } = req.body;
         
         // Validate required fields
-        if (!season_name || !start_date || !end_date) {
+        if (!season_name || !planting_date || !harvesting_date) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields: season_name, start_date, end_date'
+                error: 'Missing required fields: season_name, planting_date, harvesting_date'
             });
         }
         
         // Validate date format and logic
-        const startDate = new Date(start_date);
-        const endDate = new Date(end_date);
+        const plantingDate = new Date(planting_date);
+        const harvestingDate = new Date(harvesting_date);
         
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        if (isNaN(plantingDate.getTime()) || isNaN(harvestingDate.getTime())) {
             return res.status(400).json({
                 success: false,
                 error: 'Invalid date format. Use YYYY-MM-DD format'
             });
         }
         
-        if (startDate >= endDate) {
+        if (plantingDate >= harvestingDate) {
             return res.status(400).json({
                 success: false,
-                error: 'Start date must be before end date'
+                error: 'Planting date must be before harvesting date'
             });
         }
         
         const result = await database.run(
             `INSERT INTO production_seasons (
-                season_name, start_date, end_date, expected_yield, actual_yield,
-                weather_conditions, notes, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+                season_name, start_date, end_date, variety, carbon_certified,
+                fertilizer_used, pesticide_used, farmer_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
             [
                 season_name,
-                start_date,
-                end_date,
-                expected_yield || null,
-                actual_yield || null,
-                weather_conditions || null,
-                notes || null
+                planting_date,
+                harvesting_date,
+                variety || null,
+                carbon_certified || 0,
+                Array.isArray(fertilizer_used) ? fertilizer_used.join(',') : fertilizer_used || null,
+                Array.isArray(pesticide_used) ? pesticide_used.join(',') : pesticide_used || null,
+                farmer_id || null
             ]
         );
         

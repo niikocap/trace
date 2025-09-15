@@ -68,58 +68,50 @@ router.get('/pubkey/:publicKey', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const {
-            transaction_id,
-            transaction_type,
             from_actor_id,
             to_actor_id,
-            batch_ids,
-            quantity,
-            unit_price,
-            total_amount,
+            batch_id,
+            price_per_kg,
             payment_reference,
-            transaction_date,
-            status,
-            notes
+            status
         } = req.body;
         
         // Validate required fields
-        if (!transaction_id || !transaction_type || !from_actor_id || !to_actor_id) {
+        if (!from_actor_id || !to_actor_id) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields: transaction_id, transaction_type, from_actor_id, to_actor_id'
+                error: 'Missing required fields: from_actor_id, to_actor_id'
             });
         }
         
-        // For now, we'll simulate blockchain transaction creation
-        // In a real implementation, you would:
-        // 1. Create and sign a transaction
-        // 2. Send it to the Solana network
-        // 3. Wait for confirmation
-        
-        const transactionPDA = await solanaService.getTransactionPDA(transaction_id);
-        
-        // Simulate successful transaction creation
-        const newTransaction = {
-            publicKey: transactionPDA.toString(),
-            transaction_id,
-            transaction_type,
+        // Create real blockchain transaction
+        const transactionData = {
+            transaction_id: `TXN-${Date.now()}`,
+            transaction_type: 'sale',
             from_actor_id: parseInt(from_actor_id),
             to_actor_id: parseInt(to_actor_id),
-            batch_ids: Array.isArray(batch_ids) ? batch_ids.map(id => parseInt(id)) : [],
-            quantity: quantity || '0',
-            unit_price: unit_price || '0.00',
-            total_amount: total_amount || '0.00',
-            payment_reference: Array.isArray(payment_reference) ? payment_reference : [],
-            transaction_date: transaction_date || new Date().toISOString(),
-            status: status || 'pending',
-            notes: notes || null,
-            created_at: Date.now(),
-            updated_at: Date.now()
+            batch_ids: batch_id ? [parseInt(batch_id)] : [],
+            quantity: '0',
+            unit_price: price_per_kg || '0.00',
+            total_amount: '0.00',
+            payment_reference: payment_reference ? [payment_reference] : [],
+            transaction_date: new Date().toISOString(),
+            status: status || 'completed',
+            notes: null
         };
+        
+        // Create real blockchain transaction
+        const result = await solanaService.createRealTransaction(transactionData);
         
         res.status(201).json({
             success: true,
-            data: newTransaction,
+            data: {
+                ...transactionData,
+                publicKey: result.publicKey,
+                signature: result.signature,
+                created_at: Date.now(),
+                updated_at: Date.now()
+            },
             message: 'Transaction created successfully on blockchain'
         });
         

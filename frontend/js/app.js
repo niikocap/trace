@@ -6,9 +6,6 @@ const API_BASE_URL = 'http://localhost:3000/api';
 // Global variables
 let currentSection = 'dashboard';
 let currentEntity = null;
-let currentData = [];
-let isEditing = false;
-let editingId = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -17,8 +14,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initializeApp() {
     setupEventListeners();
+    initializeTheme();
+    initializeApiTester();
     loadDashboard();
+    loadRecentTransactions();
     showSection('dashboard');
+}
+
+// Theme Management
+function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+    
+    // Theme toggle event listener
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+}
+
+function updateThemeIcon(theme) {
+    const themeIcon = document.getElementById('themeIcon');
+    themeIcon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
 }
 
 // Event Listeners
@@ -90,13 +114,15 @@ function showSection(section) {
         'production-seasons': 'Production Seasons',
         'rice-batches': 'Rice Batches',
         'milled-rice': 'Milled Rice',
-        'chain-transactions': 'Chain Transactions'
+        'chain-transactions': 'Chain Transactions',
+        'api-tester': 'API Tester',
+        'batch-tracker': 'Batch Tracker'
     };
 
     document.getElementById('page-title').textContent = titles[section];
     
     const addBtn = document.getElementById('add-btn');
-    if (section === 'dashboard' || section === 'chain-transactions') {
+    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker') {
         addBtn.style.display = 'none';
     } else {
         addBtn.style.display = 'block';
@@ -125,6 +151,12 @@ function showSection(section) {
         case 'chain-transactions':
             loadChainTransactions();
             break;
+        case 'api-tester':
+            // No data loading needed for API tester
+            break;
+        case 'batch-tracker':
+            loadBatchTracker();
+            break;
     }
 }
 
@@ -134,17 +166,28 @@ async function loadDashboard() {
         showLoading(true);
         
         // Load counts for dashboard cards
-        const [actors, batches, milled, transactions] = await Promise.all([
-            fetchData('/chain-actors'),
-            fetchData('/rice-batches'),
-            fetchData('/milled-rice'),
-            fetchData('/transactions')
+        const [actors, batches, milled, transactions, seasons] = await Promise.all([
+            fetch(`${API_BASE_URL}/chain-actors`),
+            fetch(`${API_BASE_URL}/rice-batches`),
+            fetch(`${API_BASE_URL}/milled-rice`),
+            fetch(`${API_BASE_URL}/transactions`),
+            fetch(`${API_BASE_URL}/production-seasons`)
         ]);
 
-        document.getElementById('actors-count').textContent = actors.data?.length || 0;
-        document.getElementById('batches-count').textContent = batches.data?.length || 0;
-        document.getElementById('milled-count').textContent = milled.data?.length || 0;
-        document.getElementById('transactions-count').textContent = transactions.data?.length || 0;
+        const [actorsData, batchesData, milledData, transactionsData, seasonsData] = await Promise.all([
+            actors.json(),
+            batches.json(),
+            milled.json(),
+            transactions.json(),
+            seasons.json()
+        ]);
+
+        // Update dashboard cards
+        document.getElementById('actors-count').textContent = actorsData.success ? actorsData.data.length : '0';
+        document.getElementById('batches-count').textContent = batchesData.success ? batchesData.data.length : '0';
+        document.getElementById('milled-count').textContent = milledData.success ? milledData.data.length : '0';
+        document.getElementById('transactions-count').textContent = transactionsData.success ? transactionsData.data.length : '0';
+        document.getElementById('seasons-count').textContent = seasonsData.success ? seasonsData.data.length : '0';
         
     } catch (error) {
         console.error('Error loading dashboard:', error);
@@ -225,6 +268,42 @@ async function loadChainTransactions() {
     }
 }
 
+async function loadRecentTransactions() {
+    try {
+        const response = await fetchData('/transactions');
+        const transactions = response.data || [];
+        renderRecentTransactions(transactions.slice(0, 5)); // Show only 5 most recent
+    } catch (error) {
+        console.error('Error loading recent transactions:', error);
+        document.getElementById('recent-transactions').innerHTML = 
+            '<div class="text-center text-muted"><i class="fas fa-exclamation-triangle"></i> Unable to load recent transactions</div>';
+    }
+}
+
+function renderRecentTransactions(transactions) {
+    const container = document.getElementById('recent-transactions');
+    
+    if (!transactions || transactions.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted"><i class="fas fa-info-circle"></i> No recent transactions found</div>';
+        return;
+    }
+
+    const transactionsList = transactions.map(tx => `
+        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+            <div>
+                <div class="fw-medium text-success">${tx.transaction_type || 'Unknown'}</div>
+                <small class="text-muted">${tx.transaction_id || 'N/A'}</small>
+            </div>
+            <div class="text-end">
+                <div class="fw-medium">₱${tx.total_amount || '0.00'}</div>
+                <small class="text-muted">${formatDate(tx.transaction_date)}</small>
+            </div>
+        </div>
+    `).join('');
+
+    container.innerHTML = transactionsList;
+}
+
 // Table Rendering Functions
 function renderChainActorsTable(data) {
     const tbody = document.getElementById('actors-tbody');
@@ -243,7 +322,8 @@ function renderChainActorsTable(data) {
             <td><span class="badge bg-primary">${actor.type}</span></td>
             <td>${actor.contact_info || '-'}</td>
             <td>${actor.location || '-'}</td>
-            <td><span class="badge ${actor.status === 'active' ? 'bg-success' : 'bg-secondary'}">${actor.status}</span></td>
+            <td>${actor.group || '-'}</td>
+            <td>${actor.farmer_id || '-'}</td>
             <td class="action-buttons">
                 <button class="btn btn-sm btn-warning" onclick="editEntity('chain_actors', ${actor.id})">
                     <i class="fas fa-edit"></i>
@@ -262,7 +342,7 @@ function renderProductionSeasonsTable(data) {
     tbody.innerHTML = '';
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No production seasons found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No production seasons found</td></tr>';
         return;
     }
 
@@ -271,10 +351,11 @@ function renderProductionSeasonsTable(data) {
         row.innerHTML = `
             <td>${season.id}</td>
             <td>${season.season_name}</td>
-            <td>${formatDate(season.start_date)}</td>
-            <td>${formatDate(season.end_date)}</td>
-            <td><span class="badge ${season.status === 'active' ? 'bg-success' : 'bg-secondary'}">${season.status}</span></td>
-            <td class="text-truncate">${season.description || '-'}</td>
+            <td>${formatDate(season.planting_date)}</td>
+            <td>${formatDate(season.harvesting_date)}</td>
+            <td>${season.variety || '-'}</td>
+            <td><span class="badge ${season.carbon_certified ? 'bg-success' : 'bg-secondary'}">${season.carbon_certified ? 'Yes' : 'No'}</span></td>
+            <td>${season.farmer_id || '-'}</td>
             <td class="action-buttons">
                 <button class="btn btn-sm btn-warning" onclick="editEntity('production_seasons', ${season.id})">
                     <i class="fas fa-edit"></i>
@@ -382,7 +463,7 @@ function renderChainTransactionsTable(data) {
 }
 
 // Modal Functions
-function openModal(mode, entityType = null, id = null) {
+async function openModal(mode, entityType = null, id = null) {
     isEditing = mode === 'edit';
     editingId = id;
     
@@ -391,6 +472,9 @@ function openModal(mode, entityType = null, id = null) {
     const formFields = document.getElementById('formFields');
     
     modalTitle.textContent = isEditing ? 'Edit ' + getCurrentEntityDisplayName() : 'Add New ' + getCurrentEntityDisplayName();
+    
+    // Load dynamic options for all forms that need them
+    await loadFormOptions();
     
     // Generate form fields based on current entity
     formFields.innerHTML = generateFormFields(currentEntity);
@@ -403,18 +487,156 @@ function openModal(mode, entityType = null, id = null) {
     modal.show();
 }
 
+// Setup event listeners for dynamic fields
+function setupDynamicFieldListeners() {
+    // Multiselect dropdowns
+    document.querySelectorAll('.multiselect-dropdown').forEach(dropdown => {
+        dropdown.addEventListener('change', function() {
+            if (this.value) {
+                addChip(this.id.replace('_dropdown', ''), this.value, this.options[this.selectedIndex].text);
+                this.value = '';
+            }
+        });
+    });
+    
+    // Chips input fields
+    document.querySelectorAll('.chips-input').forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && this.value.trim()) {
+                e.preventDefault();
+                addChip(this.id.replace('_input', ''), this.value.trim(), this.value.trim());
+                this.value = '';
+            }
+        });
+    });
+}
+
+// Add chip to multiselect or chips field
+function addChip(fieldName, value, label) {
+    const chipsContainer = document.getElementById(`${fieldName}_chips`);
+    const hiddenInput = document.getElementById(fieldName);
+    
+    // Check if chip already exists
+    if (chipsContainer.querySelector(`[data-value="${value}"]`)) {
+        return;
+    }
+    
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.setAttribute('data-value', value);
+    chip.innerHTML = `
+        ${label}
+        <button type="button" class="chip-remove" onclick="removeChip('${fieldName}', '${value}')">
+            ×
+        </button>
+    `;
+    
+    chipsContainer.appendChild(chip);
+    updateHiddenInput(fieldName);
+}
+
+// Remove chip
+function removeChip(fieldName, value) {
+    const chip = document.querySelector(`#${fieldName}_chips [data-value="${value}"]`);
+    if (chip) {
+        chip.remove();
+        updateHiddenInput(fieldName);
+    }
+}
+
+// Update hidden input with current chip values
+function updateHiddenInput(fieldName) {
+    const chipsContainer = document.getElementById(`${fieldName}_chips`);
+    const hiddenInput = document.getElementById(fieldName);
+    const values = Array.from(chipsContainer.querySelectorAll('.chip')).map(chip => chip.getAttribute('data-value'));
+    hiddenInput.value = values.join(',');
+}
+
+// Store dynamic options globally
+let transactionFormOptions = {
+    actors: [],
+    batches: [],
+    farmers: [],
+    millers: [],
+    validators: [],
+    seasons: [],
+    batches: [],
+    millings: []
+};
+
+// Load dynamic form options
+async function loadFormOptions() {
+    try {
+        const [actorsResponse, seasonsResponse, batchesResponse, millingsResponse] = await Promise.all([
+            fetchData('/chain-actors'),
+            fetchData('/production-seasons'),
+            fetchData('/rice-batches'),
+            fetchData('/milled-rice')
+        ]);
+
+        // Store options globally for form generation
+        transactionFormOptions = {
+            actors: actorsResponse.data?.map(actor => ({ value: actor.id, label: actor.name })) || [],
+            farmers: actorsResponse.data?.filter(actor => {
+                const types = actor.type ? actor.type.split(',') : [];
+                return types.includes('farmer');
+            }).map(actor => ({ value: actor.id, label: actor.name })) || [],
+            millers: actorsResponse.data?.filter(actor => {
+                const types = actor.type ? actor.type.split(',') : [];
+                return types.includes('miller');
+            }).map(actor => ({ value: actor.id, label: actor.name })) || [],
+            validators: actorsResponse.data?.filter(actor => {
+                const types = actor.type ? actor.type.split(',') : [];
+                return types.includes('validator');
+            }).map(actor => ({ value: actor.id, label: actor.name })) || [],
+            seasons: seasonsResponse.data?.map(season => ({ value: season.id, label: season.season_name })) || [],
+            batches: batchesResponse.data?.map(batch => ({ value: batch.id, label: `${batch.batch_id || batch.batch_number || batch.id}` })) || [],
+            millings: millingsResponse.data?.map(milling => ({ value: milling.id, label: `Milling ${milling.id} - ${milling.rice_variety || 'Unknown'}` })) || []
+        };
+
+        console.log('Form options loaded:', transactionFormOptions);
+        
+    } catch (error) {
+        console.error('Error loading transaction form options:', error);
+    }
+}
+
 function generateFormFields(entityType) {
     const fields = getEntityFields(entityType);
     let html = '';
     
-    fields.forEach(field => {
+    // Group fields in pairs for better layout
+    for (let i = 0; i < fields.length; i += 2) {
+        const field1 = fields[i];
+        const field2 = fields[i + 1];
+        
+        html += '<div class="row">';
+        
+        // First field
         html += `
-            <div class="mb-3">
-                <label for="${field.name}" class="form-label">${field.label}</label>
-                ${generateFieldInput(field)}
+            <div class="col-md-${field2 ? '6' : '12'} mb-3">
+                ${field1.type !== 'checkbox' ? `<label for="${field1.name}" class="form-label">${field1.label}</label>` : ''}
+                ${generateFieldInput(field1)}
             </div>
         `;
-    });
+        
+        // Second field if exists
+        if (field2) {
+            html += `
+                <div class="col-md-6 mb-3">
+                    ${field2.type !== 'checkbox' ? `<label for="${field2.name}" class="form-label">${field2.label}</label>` : ''}
+                    ${generateFieldInput(field2)}
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+    }
+    
+    // Add event listeners for dynamic fields after modal is shown
+    setTimeout(() => {
+        setupDynamicFieldListeners();
+    }, 100);
     
     return html;
 }
@@ -424,20 +646,46 @@ function generateFieldInput(field) {
         case 'select':
             let options = '';
             field.options.forEach(option => {
-                options += `<option value="${option.value}">${option.label}</option>`;
+                const selected = field.defaultValue === option.value ? 'selected' : '';
+                options += `<option value="${option.value}" ${selected}>${option.label}</option>`;
             });
-            return `<select class="form-control" id="${field.name}" ${field.required ? 'required' : ''}>
-                        <option value="">Select ${field.label}</option>
+            return `<select class="form-select" id="${field.name}" ${field.required ? 'required' : ''}>
+                        ${!field.defaultValue ? `<option value="">Select ${field.label}</option>` : ''}
                         ${options}
                     </select>`;
+        case 'multiselect':
+            return `<div class="multiselect-container" id="${field.name}_container">
+                        <input type="hidden" id="${field.name}" value="">
+                        <div class="multiselect-chips" id="${field.name}_chips"></div>
+                        <select class="form-select multiselect-dropdown" id="${field.name}_dropdown">
+                            <option value="">Add ${field.label}</option>
+                            ${field.options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')}
+                        </select>
+                    </div>`;
+        case 'chips':
+            return `<div class="chips-container" id="${field.name}_container">
+                        <input type="hidden" id="${field.name}" value="">
+                        <div class="chips-display" id="${field.name}_chips"></div>
+                        <input type="text" class="form-control chips-input" id="${field.name}_input" placeholder="Type and press Enter">
+                    </div>`;
+        case 'checkbox':
+            return `<div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="${field.name}" ${field.required ? 'required' : ''}>
+                        <label class="form-check-label" for="${field.name}">
+                            ${field.label}
+                        </label>
+                    </div>`;
         case 'textarea':
             return `<textarea class="form-control" id="${field.name}" rows="3" ${field.required ? 'required' : ''}></textarea>`;
         case 'date':
-            return `<input type="date" class="form-control" id="${field.name}" ${field.required ? 'required' : ''}>`;
+            const defaultDate = field.defaultValue || '';
+            return `<input type="date" class="form-control" id="${field.name}" value="${defaultDate}" ${field.required ? 'required' : ''} ${field.readonly ? 'readonly' : ''}>`;
         case 'number':
             return `<input type="number" class="form-control" id="${field.name}" step="0.01" ${field.required ? 'required' : ''}>`;
+        case 'hidden':
+            return `<input type="hidden" id="${field.name}" value="${field.defaultValue || ''}">`;
         default:
-            return `<input type="text" class="form-control" id="${field.name}" ${field.required ? 'required' : ''}>`;
+            return `<input type="text" class="form-control" id="${field.name}" ${field.required ? 'required' : ''} ${field.readonly ? 'readonly' : ''} value="${field.defaultValue || ''}">`;
     }
 }
 
@@ -445,57 +693,93 @@ function getEntityFields(entityType) {
     const fieldDefinitions = {
         'chain_actors': [
             { name: 'name', label: 'Name', type: 'text', required: true },
-            { name: 'type', label: 'Type', type: 'select', required: true, 
+            { name: 'type', label: 'Type', type: 'multiselect', required: true, 
               options: [
                   { value: 'farmer', label: 'Farmer' },
                   { value: 'miller', label: 'Miller' },
                   { value: 'distributor', label: 'Distributor' },
-                  { value: 'retailer', label: 'Retailer' }
+                  { value: 'retailer', label: 'Retailer' },
+                  { value: 'validator', label: 'Validator' }
               ]
             },
-            { name: 'contact_info', label: 'Contact Info', type: 'text', required: false },
             { name: 'location', label: 'Location', type: 'text', required: false },
-            { name: 'status', label: 'Status', type: 'select', required: true,
+            { name: 'group', label: 'Group', type: 'select', required: false,
               options: [
-                  { value: 'active', label: 'Active' },
-                  { value: 'inactive', label: 'Inactive' }
+                  { value: 'blo', label: 'BLO' },
+                  { value: 'coop', label: 'Cooperative' },
+                  { value: 'buyback', label: 'Buyback' }
               ]
-            }
+            },
+            { name: 'farmer_id', label: 'Farmer ID', type: 'text', required: false },
+            { name: 'assign_tps', label: 'Assign TPS', type: 'text', required: false }
         ],
         'production_seasons': [
             { name: 'season_name', label: 'Season Name', type: 'text', required: true },
-            { name: 'start_date', label: 'Start Date', type: 'date', required: true },
-            { name: 'end_date', label: 'End Date', type: 'date', required: true },
-            { name: 'status', label: 'Status', type: 'select', required: true,
-              options: [
-                  { value: 'active', label: 'Active' },
-                  { value: 'inactive', label: 'Inactive' }
-              ]
-            },
-            { name: 'description', label: 'Description', type: 'textarea', required: false }
+            { name: 'planting_date', label: 'Planting Date', type: 'date', required: true },
+            { name: 'harvesting_date', label: 'Harvesting Date', type: 'date', required: true },
+            { name: 'variety', label: 'Variety', type: 'text', required: true },
+            { name: 'carbon_certified', label: 'Carbon Certified', type: 'checkbox', required: false },
+            { name: 'fertilizer_used', label: 'Fertilizer Used', type: 'chips', required: false },
+            { name: 'pesticide_used', label: 'Pesticide Used', type: 'chips', required: false },
+            { name: 'farmer_id', label: 'Farmer', type: 'select', required: true, options: transactionFormOptions.farmers }
         ],
         'rice_batches': [
-            { name: 'batch_number', label: 'Batch Number', type: 'text', required: true },
-            { name: 'farmer_id', label: 'Farmer ID', type: 'number', required: true },
-            { name: 'production_season_id', label: 'Production Season ID', type: 'number', required: true },
+            { name: 'batch_number', label: 'Batch Number', type: 'text', required: false, placeholder: 'Auto-generated if empty' },
+            { name: 'farmer_id', label: 'Farmer', type: 'select', required: true, options: transactionFormOptions.farmers },
+            { name: 'production_season_id', label: 'Production Season', type: 'select', required: true, options: transactionFormOptions.seasons },
             { name: 'rice_variety', label: 'Rice Variety', type: 'text', required: true },
+            { name: 'milling_id', label: 'Milling', type: 'select', required: false, options: transactionFormOptions.millings },
+            { name: 'validator_id', label: 'Validator', type: 'select', required: false, options: transactionFormOptions.validators },
+            { name: 'dryer', label: 'Dryer', type: 'text', required: false },
             { name: 'planting_date', label: 'Planting Date', type: 'date', required: false },
             { name: 'harvest_date', label: 'Harvest Date', type: 'date', required: false },
-            { name: 'quantity_harvested', label: 'Quantity Harvested', type: 'number', required: false },
-            { name: 'quality_grade', label: 'Quality Grade', type: 'text', required: false },
-            { name: 'farming_practices', label: 'Farming Practices', type: 'textarea', required: false },
-            { name: 'certifications', label: 'Certifications', type: 'text', required: false },
-            { name: 'storage_conditions', label: 'Storage Conditions', type: 'textarea', required: false }
+            { name: 'quantity_harvested', label: 'Quantity Harvested (kg)', type: 'number', required: false },
+            { name: 'quality_grade', label: 'Quality Grade', type: 'text', required: false }
         ],
         'milled_rice': [
-            { name: 'batch_id', label: 'Batch ID', type: 'number', required: true },
-            { name: 'miller_id', label: 'Miller ID', type: 'number', required: true },
-            { name: 'milling_date', label: 'Milling Date', type: 'date', required: true },
-            { name: 'input_quantity', label: 'Input Quantity', type: 'number', required: true },
-            { name: 'output_quantity', label: 'Output Quantity', type: 'number', required: true },
-            { name: 'milling_process', label: 'Milling Process', type: 'textarea', required: false },
-            { name: 'quality_parameters', label: 'Quality Parameters', type: 'textarea', required: false },
-            { name: 'packaging_details', label: 'Packaging Details', type: 'textarea', required: false }
+            { name: 'batch_id', label: 'Batch ID', type: 'select', required: true, options: transactionFormOptions.batches },
+            { name: 'rice_variety', label: 'Rice Variety', type: 'text', required: true },
+            { name: 'milling_date', label: 'Milling Date', type: 'date', required: true, defaultValue: new Date().toISOString().split('T')[0] },
+            { name: 'miller_id', label: 'Miller', type: 'select', required: true, options: transactionFormOptions.millers },
+            { name: 'input_quantity', label: 'Input Quantity (kg)', type: 'number', required: true },
+            { name: 'output_quantity', label: 'Output Quantity (kg)', type: 'number', required: true },
+            { name: 'quality', label: 'Quality', type: 'select', required: false,
+              options: [
+                  { value: 'premium', label: 'Premium' },
+                  { value: 'grade_a', label: 'Grade A' },
+                  { value: 'grade_b', label: 'Grade B' },
+                  { value: 'standard', label: 'Standard' }
+              ]
+            },
+            { name: 'machine', label: 'Machine', type: 'select', required: false,
+              options: [
+                  { value: 'mobile_rice_mill_type_1', label: 'Mobile Rice Mill Type 1' },
+                  { value: 'mobile_rice_mill_type_2', label: 'Mobile Rice Mill Type 2' },
+                  { value: 'stationary_rice_mill', label: 'Stationary Rice Mill' },
+                  { value: 'mini_rice_mill', label: 'Mini Rice Mill' },
+                  { value: 'compact_rice_mill', label: 'Compact Rice Mill' }
+              ]
+            }
+        ],
+        'chain_transactions': [
+            { name: 'from_actor_id', label: 'From Actor', type: 'select', required: true, options: transactionFormOptions.actors },
+            { name: 'to_actor_id', label: 'To Actor', type: 'select', required: true, options: transactionFormOptions.actors },
+            { name: 'batch_id', label: 'Batch ID', type: 'select', required: false, options: transactionFormOptions.batches },
+            { name: 'price_per_kg', label: 'Price per KG', type: 'number', required: false },
+            { name: 'payment_reference', label: 'Payment Reference', type: 'select', required: false,
+              options: [
+                  { value: 'cheque', label: 'Cheque' },
+                  { value: 'cash', label: 'Cash' },
+                  { value: 'balance', label: 'Balance' }
+              ]
+            },
+            { name: 'status', label: 'Status', type: 'select', required: true, defaultValue: 'completed',
+              options: [
+                  { value: 'pending', label: 'Pending' },
+                  { value: 'completed', label: 'Completed' },
+                  { value: 'cancelled', label: 'Cancelled' }
+              ]
+            }
         ]
     };
     
@@ -510,7 +794,20 @@ function populateForm(id) {
     fields.forEach(field => {
         const input = document.getElementById(field.name);
         if (input && entity[field.name] !== undefined) {
-            input.value = entity[field.name];
+            if (field.type === 'checkbox') {
+                input.checked = entity[field.name] === true || entity[field.name] === 1 || entity[field.name] === 'true';
+            } else if (field.type === 'chips') {
+                // Handle chips field - convert array to comma-separated string
+                if (Array.isArray(entity[field.name])) {
+                    input.value = entity[field.name].join(', ');
+                } else if (typeof entity[field.name] === 'string') {
+                    input.value = entity[field.name];
+                } else {
+                    input.value = '';
+                }
+            } else {
+                input.value = entity[field.name];
+            }
         }
     });
 }
@@ -545,6 +842,9 @@ async function saveEntity() {
                 case 'milled-rice':
                     loadMilledRice();
                     break;
+                case 'chain-transactions':
+                    loadChainTransactions();
+                    break;
             }
         } else {
             showToast(response.error || 'Operation failed', 'error');
@@ -562,9 +862,37 @@ function collectFormData() {
     fields.forEach(field => {
         const input = document.getElementById(field.name);
         if (input) {
-            data[field.name] = input.value || null;
+            let value = input.value || null;
+            
+            // Handle different field types
+            if (field.type === 'checkbox') {
+                data[field.name] = input.checked;
+            } else if (field.type === 'multiselect' || field.type === 'chips') {
+                // Convert comma-separated values to array
+                data[field.name] = value ? value.split(',').filter(v => v.trim()) : [];
+            } else if (currentEntity === 'chain_transactions') {
+                if (field.name === 'batch_ids' && value) {
+                    // Convert single batch ID to array
+                    data[field.name] = [parseInt(value)];
+                } else if (field.name === 'payment_reference' && value) {
+                    // Convert to array
+                    data[field.name] = [value];
+                } else if (field.name === 'transaction_date') {
+                    // Use today's date
+                    data[field.name] = new Date().toISOString().split('T')[0];
+                } else {
+                    data[field.name] = value;
+                }
+            } else {
+                data[field.name] = value;
+            }
         }
     });
+    
+    // Always add transaction_date for transactions
+    if (currentEntity === 'chain_transactions') {
+        data.transaction_date = new Date().toISOString().split('T')[0];
+    }
     
     return data;
 }
@@ -600,6 +928,9 @@ async function deleteEntity(entityType, id) {
                     break;
                 case 'milled-rice':
                     loadMilledRice();
+                    break;
+                case 'chain-transactions':
+                    loadChainTransactions();
                     break;
             }
         } else {
@@ -652,7 +983,8 @@ function getEntityEndpoint(entityType) {
         'chain_actors': '/chain-actors',
         'production_seasons': '/production-seasons',
         'rice_batches': '/rice-batches',
-        'milled_rice': '/milled-rice'
+        'milled_rice': '/milled-rice',
+        'chain_transactions': '/transactions'
     };
     return endpoints[entityType];
 }
@@ -662,7 +994,8 @@ function getCurrentEntityDisplayName() {
         'chain_actors': 'Chain Actor',
         'production_seasons': 'Production Season',
         'rice_batches': 'Rice Batch',
-        'milled_rice': 'Milled Rice'
+        'milled_rice': 'Milled Rice',
+        'chain_transactions': 'Chain Transaction'
     };
     return names[currentEntity] || 'Item';
 }
@@ -721,4 +1054,295 @@ function showToast(message, type = 'info') {
     
     const bsToast = new bootstrap.Toast(toast);
     bsToast.show();
+}
+
+// API Tester functionality
+function initializeApiTester() {
+    const methodSelect = document.getElementById('api-method');
+    const endpointSelect = document.getElementById('api-endpoint');
+    const urlInput = document.getElementById('api-url');
+    const sendButton = document.getElementById('send-request');
+    const clearButton = document.getElementById('clear-response');
+    const requestBodySection = document.getElementById('request-body-section');
+
+    // Update URL when method or endpoint changes
+    function updateUrl() {
+        const baseUrl = 'http://localhost:3000';
+        const endpoint = endpointSelect.value;
+        urlInput.value = baseUrl + endpoint;
+        
+        // Show/hide request body section based on method
+        const method = methodSelect.value;
+        if (method === 'POST' || method === 'PUT') {
+            requestBodySection.style.display = 'block';
+        } else {
+            requestBodySection.style.display = 'none';
+        }
+    }
+
+    methodSelect.addEventListener('change', updateUrl);
+    endpointSelect.addEventListener('change', updateUrl);
+
+    // Send API request
+    sendButton.addEventListener('click', async function() {
+        const method = methodSelect.value;
+        const url = urlInput.value;
+        const headersText = document.getElementById('api-headers').value;
+        const bodyText = document.getElementById('api-body').value;
+        const responseElement = document.getElementById('api-response');
+        const statusElement = document.getElementById('response-status');
+
+        try {
+            statusElement.textContent = 'Loading...';
+            statusElement.className = 'badge bg-warning';
+
+            // Parse headers
+            let headers = {};
+            if (headersText.trim()) {
+                headers = JSON.parse(headersText);
+            }
+
+            // Prepare request options
+            const options = {
+                method: method,
+                headers: headers
+            };
+
+            // Add body for POST/PUT requests
+            if ((method === 'POST' || method === 'PUT') && bodyText.trim()) {
+                options.body = bodyText;
+            }
+
+            const startTime = Date.now();
+            const response = await fetch(url, options);
+            const endTime = Date.now();
+            const responseTime = endTime - startTime;
+
+            const responseData = await response.text();
+            let formattedResponse;
+
+            try {
+                // Try to parse as JSON for pretty formatting
+                const jsonData = JSON.parse(responseData);
+                formattedResponse = JSON.stringify(jsonData, null, 2);
+            } catch {
+                // If not JSON, display as plain text
+                formattedResponse = responseData;
+            }
+
+            // Update status badge
+            if (response.ok) {
+                statusElement.textContent = `${response.status} ${response.statusText} (${responseTime}ms)`;
+                statusElement.className = 'badge bg-success';
+            } else {
+                statusElement.textContent = `${response.status} ${response.statusText} (${responseTime}ms)`;
+                statusElement.className = 'badge bg-danger';
+            }
+
+            // Display response
+            responseElement.textContent = formattedResponse;
+
+        } catch (error) {
+            statusElement.textContent = 'Error';
+            statusElement.className = 'badge bg-danger';
+            responseElement.textContent = `Error: ${error.message}`;
+        }
+    });
+
+    // Clear response
+    clearButton.addEventListener('click', function() {
+        document.getElementById('api-response').textContent = 'Click "Send Request" to see the response here...';
+        document.getElementById('response-status').textContent = 'Ready';
+        document.getElementById('response-status').className = 'badge bg-secondary';
+    });
+
+    // Initialize URL
+    updateUrl();
+}
+
+// Batch Tracker functionality
+async function loadBatchTracker() {
+    try {
+        showLoading(true);
+        
+        // Load all batches for selection
+        const response = await fetch(`${API_BASE_URL}/rice-batches`);
+        const data = await response.json();
+        
+        if (data.success) {
+            populateBatchList(data.data);
+            setupBatchSearch(data.data);
+        }
+        
+        showLoading(false);
+    } catch (error) {
+        console.error('Error loading batch tracker:', error);
+        showToast('Error loading batch data', 'error');
+        showLoading(false);
+    }
+}
+
+function populateBatchList(batches) {
+    const batchList = document.getElementById('batch-list');
+    batchList.innerHTML = '';
+    
+    batches.forEach(batch => {
+        const listItem = document.createElement('a');
+        listItem.href = '#';
+        listItem.className = 'list-group-item list-group-item-action';
+        listItem.dataset.batchId = batch.id;
+        listItem.innerHTML = `
+            <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">${batch.batch_number}</h6>
+                <small>${new Date(batch.created_at).toLocaleDateString()}</small>
+            </div>
+            <p class="mb-1">${batch.rice_variety}</p>
+            <small>Farmer: ${batch.farmer_name || 'Unknown'}</small>
+        `;
+        
+        listItem.addEventListener('click', (e) => {
+            e.preventDefault();
+            selectBatch(batch.id);
+            
+            // Update active state
+            document.querySelectorAll('#batch-list .list-group-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            listItem.classList.add('active');
+        });
+        
+        batchList.appendChild(listItem);
+    });
+}
+
+function setupBatchSearch(batches) {
+    const searchInput = document.getElementById('batch-search-input');
+    
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filteredBatches = batches.filter(batch => 
+            batch.batch_number.toLowerCase().includes(searchTerm) ||
+            batch.rice_variety.toLowerCase().includes(searchTerm) ||
+            (batch.farmer_name && batch.farmer_name.toLowerCase().includes(searchTerm))
+        );
+        
+        populateBatchList(filteredBatches);
+    });
+}
+
+async function selectBatch(batchId) {
+    try {
+        showLoading(true);
+        
+        // Fetch comprehensive batch data
+        const [batchResponse, millingResponse, transactionsResponse] = await Promise.all([
+            fetch(`${API_BASE_URL}/rice-batches/${batchId}`),
+            fetch(`${API_BASE_URL}/milled-rice?batch_id=${batchId}`),
+            fetch(`${API_BASE_URL}/transactions?batch_id=${batchId}`)
+        ]);
+        
+        const batchData = await batchResponse.json();
+        const millingData = await millingResponse.json();
+        const transactionsData = await transactionsResponse.json();
+        
+        if (batchData.success) {
+            displayBatchDetails(batchData.data, millingData.data || [], transactionsData.data || []);
+        }
+        
+        showLoading(false);
+    } catch (error) {
+        console.error('Error loading batch details:', error);
+        showToast('Error loading batch details', 'error');
+        showLoading(false);
+    }
+}
+
+function displayBatchDetails(batch, millingData, transactions) {
+    // Show batch details section and hide empty state
+    document.getElementById('batch-details').style.display = 'block';
+    document.getElementById('batch-empty-state').style.display = 'none';
+    
+    // Populate batch overview
+    const batchOverview = document.getElementById('batch-overview');
+    batchOverview.innerHTML = `
+        <div class="col-md-6">
+            <p><strong>Batch Number:</strong> ${batch.batch_number}</p>
+            <p><strong>Rice Variety:</strong> ${batch.rice_variety}</p>
+            <p><strong>Quality Grade:</strong> ${batch.quality_grade || 'N/A'}</p>
+            <p><strong>Quantity Harvested:</strong> ${batch.quantity_harvested || 'N/A'} kg</p>
+        </div>
+        <div class="col-md-6">
+            <p><strong>Planting Date:</strong> ${batch.planting_date ? new Date(batch.planting_date).toLocaleDateString() : 'N/A'}</p>
+            <p><strong>Harvest Date:</strong> ${batch.harvest_date ? new Date(batch.harvest_date).toLocaleDateString() : 'N/A'}</p>
+            <p><strong>Storage Conditions:</strong> ${batch.storage_conditions || 'N/A'}</p>
+            <p><strong>Certifications:</strong> ${batch.certifications || 'N/A'}</p>
+        </div>
+    `;
+    
+    // Populate farmer information
+    const farmerInfo = document.getElementById('farmer-info');
+    farmerInfo.innerHTML = `
+        <div class="col-md-6">
+            <p><strong>Name:</strong> ${batch.farmer_name || 'N/A'}</p>
+            <p><strong>Contact:</strong> ${batch.farmer_contact || 'N/A'}</p>
+        </div>
+        <div class="col-md-6">
+            <p><strong>Location:</strong> ${batch.farmer_location || 'N/A'}</p>
+            <p><strong>Group:</strong> ${batch.farmer_group || 'N/A'}</p>
+        </div>
+    `;
+    
+    // Populate season information
+    const seasonInfo = document.getElementById('season-info');
+    seasonInfo.innerHTML = `
+        <div class="col-md-6">
+            <p><strong>Season Name:</strong> ${batch.season_name || 'N/A'}</p>
+            <p><strong>Planting Date:</strong> ${batch.season_planting_date ? new Date(batch.season_planting_date).toLocaleDateString() : 'N/A'}</p>
+        </div>
+        <div class="col-md-6">
+            <p><strong>Harvesting Date:</strong> ${batch.season_harvesting_date ? new Date(batch.season_harvesting_date).toLocaleDateString() : 'N/A'}</p>
+            <p><strong>Variety:</strong> ${batch.season_variety || 'N/A'}</p>
+        </div>
+    `;
+    
+    // Populate milling data (only show the first/latest milling record)
+    const millingDataDiv = document.getElementById('milling-data');
+    if (millingData && millingData.length > 0) {
+        const milling = millingData[0]; // Show only the first milling record
+        millingDataDiv.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Milling Date:</strong> ${new Date(milling.milling_date).toLocaleDateString()}</p>
+                    <p><strong>Miller:</strong> ${milling.miller_name || 'N/A'}</p>
+                    <p><strong>Input Quantity:</strong> ${milling.input_quantity} kg</p>
+                    <p><strong>Machine:</strong> ${milling.machine || 'N/A'}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Output Quantity:</strong> ${milling.output_quantity} kg</p>
+                    <p><strong>Yield:</strong> ${((milling.output_quantity / milling.input_quantity) * 100).toFixed(1)}%</p>
+                    <p><strong>Quality:</strong> ${milling.quality || 'N/A'}</p>
+                    <p><strong>Notes:</strong> ${milling.notes || 'N/A'}</p>
+                </div>
+            </div>
+        `;
+    } else {
+        millingDataDiv.innerHTML = '<p class="text-muted">No milling data available for this batch.</p>';
+    }
+    
+    // Populate transaction history
+    const transactionsTbody = document.getElementById('batch-transactions-tbody');
+    if (transactions && transactions.length > 0) {
+        transactionsTbody.innerHTML = transactions.map(transaction => `
+            <tr>
+                <td>${new Date(transaction.transaction_date).toLocaleDateString()}</td>
+                <td><span class="badge bg-info">${transaction.transaction_type}</span></td>
+                <td>${transaction.from_actor_name || 'N/A'}</td>
+                <td>${transaction.to_actor_name || 'N/A'}</td>
+                <td>₱${transaction.total_amount || '0.00'}</td>
+                <td><span class="badge bg-${transaction.status === 'completed' ? 'success' : 'warning'}">${transaction.status}</span></td>
+            </tr>
+        `).join('');
+    } else {
+        transactionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No transactions found for this batch.</td></tr>';
+    }
 }

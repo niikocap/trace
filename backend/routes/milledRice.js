@@ -73,17 +73,20 @@ router.post('/', async (req, res) => {
             grade,
             milling_date,
             miller_id,
-            quantity_milled,
+            input_quantity,
+            output_quantity,
+            quality,
+            machine,
             milling_yield_percentage,
             quality_parameters,
             storage_location
         } = req.body;
         
         // Validate required fields
-        if (!batch_id || !rice_variety || !milling_date || !miller_id || !quantity_milled) {
+        if (!batch_id || !rice_variety || !milling_date || !miller_id || !input_quantity || !output_quantity) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields: batch_id, rice_variety, milling_date, miller_id, quantity_milled'
+                error: 'Missing required fields: batch_id, rice_variety, milling_date, miller_id, input_quantity, output_quantity'
             });
         }
         
@@ -113,29 +116,43 @@ router.post('/', async (req, res) => {
             });
         }
         
-        // Validate quantity
-        const quantity = parseFloat(quantity_milled);
-        if (isNaN(quantity) || quantity <= 0) {
+        // Validate quantities
+        const inputQty = parseFloat(input_quantity);
+        const outputQty = parseFloat(output_quantity);
+        if (isNaN(inputQty) || inputQty <= 0) {
             return res.status(400).json({
                 success: false,
-                error: 'quantity_milled must be a positive number'
+                error: 'input_quantity must be a positive number'
             });
         }
+        if (isNaN(outputQty) || outputQty <= 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'output_quantity must be a positive number'
+            });
+        }
+        
+        // Calculate milling yield percentage if not provided
+        const yieldPercentage = milling_yield_percentage || ((outputQty / inputQty) * 100).toFixed(2);
         
         const result = await database.run(
             `INSERT INTO milled_rice (
                 batch_id, rice_variety, grade, milling_date, miller_id,
-                quantity_milled, milling_yield_percentage, quality_parameters,
+                input_quantity, output_quantity, quality, machine,
+                milling_yield_percentage, quality_parameters,
                 storage_location, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
             [
                 batch_id,
                 rice_variety,
                 grade || null,
                 milling_date,
                 miller_id,
-                quantity_milled,
-                milling_yield_percentage || null,
+                input_quantity,
+                output_quantity,
+                quality || null,
+                machine || null,
+                yieldPercentage,
                 quality_parameters || null,
                 storage_location || null
             ]
