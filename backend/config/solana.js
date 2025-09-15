@@ -56,8 +56,15 @@ class SolanaService {
             
             if (process.env.SOLANA_PRIVATE_KEY) {
                 // Production: Use environment variable
-                const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
-                walletKeypair = Keypair.fromSecretKey(Uint8Array.from(privateKeyArray));
+                try {
+                    const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
+                    if (!Array.isArray(privateKeyArray) || privateKeyArray.length !== 64) {
+                        throw new Error(`Invalid private key format. Expected array of 64 numbers, got ${privateKeyArray.length} elements`);
+                    }
+                    walletKeypair = Keypair.fromSecretKey(Uint8Array.from(privateKeyArray));
+                } catch (parseError) {
+                    throw new Error(`Failed to parse SOLANA_PRIVATE_KEY: ${parseError.message}`);
+                }
             } else {
                 // Development: Use local file
                 const walletPath = path.join(process.env.HOME || '/tmp', '.config/solana/id.json');
