@@ -100,6 +100,8 @@ class SolanaService {
                 this.serializeVecString(transactionData.payment_reference || []),
                 this.serializeString(transactionData.transaction_date),
                 this.serializeString(transactionData.status),
+                this.serializeOptionU8(transactionData.quality),
+                this.serializeOption(transactionData.moisture),
                 this.serializeOption(transactionData.notes)
             ]);
             
@@ -163,6 +165,14 @@ class SolanaService {
             return Buffer.from([0]); // None
         } else {
             return Buffer.concat([Buffer.from([1]), this.serializeString(value)]); // Some
+        }
+    }
+    
+    serializeOptionU8(value) {
+        if (value === null || value === undefined) {
+            return Buffer.from([0]); // None
+        } else {
+            return Buffer.concat([Buffer.from([1]), Buffer.from([value])]); // Some
         }
     }
 
@@ -327,6 +337,31 @@ class SolanaService {
             const status = data.subarray(offset, offset + statusLength).toString('utf8');
             offset += statusLength;
             
+            // Read quality (Option<u8>)
+            if (offset + 1 > data.length) return null;
+            const hasQuality = data.readUInt8(offset);
+            offset += 1;
+            let quality = null;
+            if (hasQuality === 1) {
+                if (offset + 1 > data.length) return null;
+                quality = data.readUInt8(offset);
+                offset += 1;
+            }
+            
+            // Read moisture (Option<String>)
+            if (offset + 1 > data.length) return null;
+            const hasMoisture = data.readUInt8(offset);
+            offset += 1;
+            let moisture = null;
+            if (hasMoisture === 1) {
+                if (offset + 4 > data.length) return null;
+                const moistureLength = data.readUInt32LE(offset);
+                offset += 4;
+                if (offset + moistureLength > data.length) return null;
+                moisture = data.subarray(offset, offset + moistureLength).toString('utf8');
+                offset += moistureLength;
+            }
+            
             // Read notes (Option<String>)
             if (offset + 1 > data.length) return null;
             const hasNotes = data.readUInt8(offset);
@@ -352,6 +387,8 @@ class SolanaService {
                 payment_reference,
                 transaction_date,
                 status,
+                quality,
+                moisture,
                 notes
             };
         } catch (error) {

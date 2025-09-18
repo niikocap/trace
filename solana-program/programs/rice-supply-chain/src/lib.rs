@@ -20,6 +20,8 @@ pub mod rice_supply_chain {
         payment_reference: Vec<String>,
         transaction_date: String,
         status: String,
+        quality: Option<u8>,
+        moisture: Option<String>,
         notes: Option<String>,
     ) -> Result<()> {
         let transaction = &mut ctx.accounts.transaction;
@@ -34,6 +36,8 @@ pub mod rice_supply_chain {
         transaction.payment_reference = payment_reference;
         transaction.transaction_date = transaction_date;
         transaction.status = status;
+        transaction.quality = quality;
+        transaction.moisture = moisture;
         transaction.notes = notes;
         transaction.created_at = Clock::get()?.unix_timestamp;
         transaction.updated_at = Clock::get()?.unix_timestamp;
@@ -53,6 +57,8 @@ pub mod rice_supply_chain {
         payment_reference: Option<Vec<String>>,
         transaction_date: Option<String>,
         status: Option<String>,
+        quality: Option<u8>,
+        moisture: Option<String>,
         notes: Option<String>,
     ) -> Result<()> {
         let transaction = &mut ctx.accounts.transaction;
@@ -86,6 +92,12 @@ pub mod rice_supply_chain {
         }
         if let Some(stat) = status {
             transaction.status = stat;
+        }
+        if let Some(qual) = quality {
+            transaction.quality = Some(qual);
+        }
+        if let Some(moist) = moisture {
+            transaction.moisture = Some(moist);
         }
         if let Some(note) = notes {
             transaction.notes = Some(note);
@@ -136,6 +148,10 @@ pub struct ChainTransaction {
     pub payment_reference: Vec<String>,
     pub transaction_date: String,
     pub status: String,
+    /// Quality grade: 0=premium, 1=well-milled, 2=regular, 3=broken
+    pub quality: Option<u8>,
+    /// Moisture content percentage
+    pub moisture: Option<String>,
     pub notes: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -155,6 +171,8 @@ impl Space for ChainTransaction {
         4 + 4 * 10 + 32 * 10 + // payment_reference (Vec<String>) - assuming max 10 refs
         4 + 32 + // transaction_date (String)
         4 + 32 + // status (String)
+        1 + 1 + // quality (Option<u8>)
+        1 + 4 + 16 + // moisture (Option<String>)
         1 + 4 + 32 + // notes (Option<String>)
         8 + // created_at (i64)
         8 + // updated_at (i64)

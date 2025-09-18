@@ -73,7 +73,9 @@ router.post('/', async (req, res) => {
             batch_id,
             price_per_kg,
             payment_reference,
-            status
+            status,
+            quality,
+            moisture
         } = req.body;
         
         // Validate required fields
@@ -97,6 +99,8 @@ router.post('/', async (req, res) => {
             payment_reference: payment_reference ? [payment_reference] : [],
             transaction_date: new Date().toISOString(),
             status: status || 'completed',
+            quality: quality !== undefined ? parseInt(quality) : null,
+            moisture: moisture || null,
             notes: null
         };
         

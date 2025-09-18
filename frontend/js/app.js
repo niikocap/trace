@@ -260,6 +260,23 @@ async function loadChainTransactions() {
         showLoading(true);
         const response = await fetchData('/transactions');
         currentData = response.data || [];
+        
+        // Enrich transaction data with actor names
+        const actorsResponse = await fetchData('/chain-actors');
+        const actors = actorsResponse.data || [];
+        
+        // Create actor lookup map
+        const actorMap = {};
+        actors.forEach(actor => {
+            actorMap[actor.id] = actor.name;
+        });
+        
+        // Add actor names to transactions
+        currentData.forEach(transaction => {
+            transaction.from_actor_name = actorMap[transaction.from_actor_id] || null;
+            transaction.to_actor_name = actorMap[transaction.to_actor_id] || null;
+        });
+        
         renderChainTransactionsTable(currentData);
     } catch (error) {
         console.error('Error loading chain transactions:', error);
@@ -443,24 +460,56 @@ function renderChainTransactionsTable(data) {
     tbody.innerHTML = '';
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No chain transactions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No chain transactions found</td></tr>';
         return;
     }
 
     data.forEach(transaction => {
         const row = document.createElement('tr');
+        
+        // Create batch ID links
+        let batchLinks = '-';
+        if (transaction.batch_ids && transaction.batch_ids.length > 0) {
+            batchLinks = transaction.batch_ids.map(batchId => 
+                `<a href="#" class="text-primary text-decoration-none" onclick="openBatchDetails(${batchId})">
+                    <i class="fas fa-box me-1"></i>${batchId}
+                </a>`
+            ).join(', ');
+        }
+        
+        // Create actor links
+        const fromActorLink = transaction.from_actor_name ? 
+            `<a href="#" class="text-primary text-decoration-none" onclick="showActorInfo(${transaction.from_actor_id})">
+                <i class="fas fa-user me-1"></i>${transaction.from_actor_name}
+            </a>` : (transaction.from_actor_id || '-');
+            
+        const toActorLink = transaction.to_actor_name ? 
+            `<a href="#" class="text-primary text-decoration-none" onclick="showActorInfo(${transaction.to_actor_id})">
+                <i class="fas fa-user me-1"></i>${transaction.to_actor_name}
+            </a>` : (transaction.to_actor_id || '-');
+        
+        // Format payment reference
+        let paymentRef = '-';
+        if (transaction.payment_reference && transaction.payment_reference.length > 0) {
+            paymentRef = transaction.payment_reference.join(', ');
+        }
+        
         row.innerHTML = `
             <td class="text-truncate">${transaction.transaction_id}</td>
-            <td><span class="badge bg-info">${transaction.transaction_type}</span></td>
-            <td>${transaction.from_actor_id || '-'}</td>
-            <td>${transaction.to_actor_id || '-'}</td>
+            <td>${batchLinks}</td>
+            <td>${fromActorLink}</td>
+            <td>${toActorLink}</td>
             <td>${transaction.quantity || '-'}</td>
-            <td>${transaction.total_amount || '-'}</td>
+            <td>₱${transaction.total_amount || '0.00'}</td>
+            <td><span class="badge bg-secondary">${paymentRef}</span></td>
             <td>${formatDate(transaction.transaction_date)}</td>
             <td><span class="badge ${getStatusBadgeClass(transaction.status)}">${transaction.status}</span></td>
         `;
         tbody.appendChild(row);
     });
+    
+    // Also render Solana transaction IDs table
+    renderSolanaTransactionsTable(data);
 }
 
 // Modal Functions
@@ -1346,4 +1395,190 @@ function displayBatchDetails(batch, millingData, transactions) {
     } else {
         transactionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No transactions found for this batch.</td></tr>';
     }
+}
+
+// Function to render Solana transaction IDs table
+function renderSolanaTransactionsTable(data) {
+    const tbody = document.getElementById('solana-transactions-tbody');
+    tbody.innerHTML = '';
+
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No Solana transactions found</td></tr>';
+        return;
+    }
+
+    data.forEach(transaction => {
+        // Generate mock Solana transaction signature for demo purposes
+        const solanaSignature = generateMockSolanaSignature();
+        const explorerUrl = `https://explorer.solana.com/tx/${solanaSignature}?cluster=devnet`;
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="text-truncate">${transaction.transaction_id}</td>
+            <td class="text-truncate font-monospace">${solanaSignature}</td>
+            <td>${formatDate(transaction.transaction_date)}</td>
+            <td><span class="badge bg-success">Confirmed</span></td>
+            <td>
+                <a href="${explorerUrl}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-external-link-alt me-1"></i>View on Explorer
+                </a>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Generate mock Solana transaction signature
+function generateMockSolanaSignature() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 88; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// Function to show actor information modal
+async function showActorInfo(actorId) {
+    try {
+        const response = await fetchData(`/chain-actors/${actorId}`);
+        if (response.success && response.data) {
+            const actor = response.data;
+            
+            const modalTitle = document.getElementById('actorModalTitle');
+            const modalContent = document.getElementById('actorInfoContent');
+            
+            modalTitle.innerHTML = `<i class="fas fa-user me-2"></i>${actor.name}`;
+            
+            modalContent.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title text-primary">
+                                    <i class="fas fa-info-circle me-2"></i>Basic Information
+                                </h6>
+                                <p><strong>ID:</strong> ${actor.id}</p>
+                                <p><strong>Name:</strong> ${actor.name}</p>
+                                <p><strong>Type:</strong> <span class="badge bg-primary">${actor.type}</span></p>
+                                <p><strong>Farmer ID:</strong> ${actor.farmer_id || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title text-success">
+                                    <i class="fas fa-map-marker-alt me-2"></i>Contact & Location
+                                </h6>
+                                <p><strong>Contact Info:</strong> ${actor.contact_info || 'N/A'}</p>
+                                <p><strong>Location:</strong> ${actor.location || 'N/A'}</p>
+                                <p><strong>Group:</strong> ${actor.group || 'N/A'}</p>
+                                <p><strong>TPS Assignment:</strong> ${actor.assign_tps || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title text-info">
+                                    <i class="fas fa-chart-line me-2"></i>Activity Summary
+                                </h6>
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <div class="p-2">
+                                            <div class="h4 text-primary mb-0" id="actor-transactions-count">-</div>
+                                            <small class="text-muted">Transactions</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-2">
+                                            <div class="h4 text-success mb-0" id="actor-batches-count">-</div>
+                                            <small class="text-muted">Batches</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-2">
+                                            <div class="h4 text-info mb-0" id="actor-volume">-</div>
+                                            <small class="text-muted">Total Volume (kg)</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-2">
+                                            <div class="h4 text-warning mb-0" id="actor-value">-</div>
+                                            <small class="text-muted">Total Value (₱)</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Load activity statistics
+            loadActorStatistics(actorId);
+            
+            const modal = new bootstrap.Modal(document.getElementById('actorInfoModal'));
+            modal.show();
+        } else {
+            showToast('Actor not found', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading actor info:', error);
+        showToast('Error loading actor information', 'error');
+    }
+}
+
+// Load actor statistics
+async function loadActorStatistics(actorId) {
+    try {
+        const [transactionsResponse, batchesResponse] = await Promise.all([
+            fetchData('/transactions'),
+            fetchData('/rice-batches')
+        ]);
+        
+        const transactions = transactionsResponse.data || [];
+        const batches = batchesResponse.data || [];
+        
+        // Filter transactions for this actor
+        const actorTransactions = transactions.filter(tx => 
+            tx.from_actor_id == actorId || tx.to_actor_id == actorId
+        );
+        
+        // Filter batches for this actor (if farmer)
+        const actorBatches = batches.filter(batch => batch.farmer_id == actorId);
+        
+        // Calculate statistics
+        const transactionCount = actorTransactions.length;
+        const batchCount = actorBatches.length;
+        const totalVolume = actorBatches.reduce((sum, batch) => 
+            sum + (parseFloat(batch.quantity_harvested) || 0), 0
+        );
+        const totalValue = actorTransactions.reduce((sum, tx) => 
+            sum + (parseFloat(tx.total_amount) || 0), 0
+        );
+        
+        // Update UI
+        document.getElementById('actor-transactions-count').textContent = transactionCount;
+        document.getElementById('actor-batches-count').textContent = batchCount;
+        document.getElementById('actor-volume').textContent = totalVolume.toFixed(2);
+        document.getElementById('actor-value').textContent = totalValue.toFixed(2);
+        
+    } catch (error) {
+        console.error('Error loading actor statistics:', error);
+    }
+}
+
+// Function to open batch details (navigate to batch tracker)
+function openBatchDetails(batchId) {
+    // Switch to batch tracker section
+    showSection('batch-tracker');
+    
+    // Load and select the specific batch
+    setTimeout(() => {
+        loadBatchDetails(batchId);
+    }, 100);
 }
