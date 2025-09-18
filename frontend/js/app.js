@@ -22,6 +22,41 @@ function initializeApp() {
     showSection('dashboard');
 }
 
+// API Tester
+function initializeApiTester() {
+    // Update API URL based on current domain
+    const currentDomain = `${window.location.protocol}//${window.location.host}`;
+    const apiUrlInput = document.getElementById('api-url');
+    const endpointSelect = document.getElementById('api-endpoint');
+    
+    if (!apiUrlInput || !endpointSelect) return; // Elements may not exist yet
+    
+    function updateApiUrl() {
+        const selectedEndpoint = endpointSelect.value;
+        apiUrlInput.value = `${currentDomain}/api${selectedEndpoint}`;
+    }
+    
+    // Set initial URL
+    updateApiUrl();
+    
+    // Update URL when endpoint changes
+    endpointSelect.addEventListener('change', updateApiUrl);
+    
+    // Update method dropdown change handler
+    const methodSelect = document.getElementById('api-method');
+    const requestBodySection = document.getElementById('request-body-section');
+    
+    if (methodSelect && requestBodySection) {
+        methodSelect.addEventListener('change', function() {
+            if (this.value === 'POST' || this.value === 'PUT') {
+                requestBodySection.style.display = 'block';
+            } else {
+                requestBodySection.style.display = 'none';
+            }
+        });
+    }
+}
+
 // Theme Management
 function initializeTheme() {
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -79,7 +114,8 @@ function setupSearchListeners() {
         'seasons-search', 
         'batches-search',
         'milled-search',
-        'transactions-search'
+        'transactions-search',
+        'solana-transactions-search'
     ];
 
     searchInputs.forEach(inputId => {
@@ -116,6 +152,7 @@ function showSection(section) {
         'rice-batches': 'Rice Batches',
         'milled-rice': 'Milled Rice',
         'chain-transactions': 'Chain Transactions',
+        'solana-transactions': 'Solana Transactions',
         'api-tester': 'API Tester',
         'batch-tracker': 'Batch Tracker'
     };
@@ -123,7 +160,7 @@ function showSection(section) {
     document.getElementById('page-title').textContent = titles[section];
     
     const addBtn = document.getElementById('add-btn');
-    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker') {
+    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker' || section === 'solana-transactions') {
         addBtn.style.display = 'none';
     } else {
         addBtn.style.display = 'block';
@@ -152,8 +189,11 @@ function showSection(section) {
         case 'chain-transactions':
             loadChainTransactions();
             break;
+        case 'solana-transactions':
+            loadSolanaTransactions();
+            break;
         case 'api-tester':
-            // No data loading needed for API tester
+            initializeApiTester();
             break;
         case 'batch-tracker':
             loadBatchTracker();
@@ -281,6 +321,21 @@ async function loadChainTransactions() {
     } catch (error) {
         console.error('Error loading chain transactions:', error);
         showToast('Error loading chain transactions', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Load Solana transactions for separate page
+async function loadSolanaTransactions() {
+    try {
+        showLoading(true);
+        const response = await fetchData('/transactions');
+        const transactions = response.data || [];
+        renderSolanaTransactionsTable(transactions);
+    } catch (error) {
+        console.error('Error loading Solana transactions:', error);
+        showToast('Error loading Solana transactions', 'error');
     } finally {
         showLoading(false);
     }
@@ -460,21 +515,17 @@ function renderChainTransactionsTable(data) {
     tbody.innerHTML = '';
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No chain transactions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No chain transactions found</td></tr>';
         return;
     }
 
     data.forEach(transaction => {
         const row = document.createElement('tr');
         
-        // Create batch ID links
-        let batchLinks = '-';
+        // Display batch IDs without links
+        let batchDisplay = '-';
         if (transaction.batch_ids && transaction.batch_ids.length > 0) {
-            batchLinks = transaction.batch_ids.map(batchId => 
-                `<a href="#" class="text-primary text-decoration-none" onclick="openBatchDetails(${batchId})">
-                    <i class="fas fa-box me-1"></i>${batchId}
-                </a>`
-            ).join(', ');
+            batchDisplay = transaction.batch_ids.join(', ');
         }
         
         // Create actor links
@@ -494,22 +545,22 @@ function renderChainTransactionsTable(data) {
             paymentRef = transaction.payment_reference.join(', ');
         }
         
+        // Format moisture
+        const moistureDisplay = transaction.moisture || '-';
+        
         row.innerHTML = `
-            <td class="text-truncate">${transaction.transaction_id}</td>
-            <td>${batchLinks}</td>
+            <td>${batchDisplay}</td>
             <td>${fromActorLink}</td>
             <td>${toActorLink}</td>
             <td>${transaction.quantity || '-'}</td>
             <td>₱${transaction.total_amount || '0.00'}</td>
             <td><span class="badge bg-secondary">${paymentRef}</span></td>
+            <td>${moistureDisplay}</td>
             <td>${formatDate(transaction.transaction_date)}</td>
             <td><span class="badge ${getStatusBadgeClass(transaction.status)}">${transaction.status}</span></td>
         `;
         tbody.appendChild(row);
     });
-    
-    // Also render Solana transaction IDs table
-    renderSolanaTransactionsTable(data);
 }
 
 // Modal Functions
@@ -1579,6 +1630,61 @@ function openBatchDetails(batchId) {
     
     // Load and select the specific batch
     setTimeout(() => {
-        loadBatchDetails(batchId);
+        selectBatch(batchId);
     }, 100);
+}
+
+// Filter table function for search functionality
+function filterTable(searchTerm, tableType) {
+    const tableId = tableType === 'solana-transactions' ? 'solana-transactions-table' : `${tableType}-table`;
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    const rows = tbody.querySelectorAll('tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const matches = text.includes(searchTerm.toLowerCase());
+        row.style.display = matches ? '' : 'none';
+    });
+}
+
+// Get status badge class helper
+function getStatusBadgeClass(status) {
+    switch(status?.toLowerCase()) {
+        case 'completed': return 'bg-success';
+        case 'pending': return 'bg-warning';
+        case 'cancelled': return 'bg-danger';
+        default: return 'bg-secondary';
+    }
+}
+
+// Format date helper
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    try {
+        return new Date(dateString).toLocaleDateString();
+    } catch {
+        return dateString;
+    }
+}
+
+// Fetch data helper
+async function fetchData(endpoint) {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`);
+    return await response.json();
+}
+
+// Show loading helper
+function showLoading(show) {
+    const spinner = document.getElementById('loadingSpinner');
+    if (spinner) {
+        spinner.classList.toggle('d-none', !show);
+    }
+}
+
+// Show toast helper
+function showToast(message, type = 'info') {
+    console.log(`Toast (${type}): ${message}`);
 }
