@@ -874,6 +874,15 @@ function getEntityFields(entityType) {
                   { value: 'balance', label: 'Balance' }
               ]
             },
+            { name: 'quality', label: 'Quality Grade', type: 'select', required: false,
+              options: [
+                  { value: '0', label: 'Premium' },
+                  { value: '1', label: 'Well-milled' },
+                  { value: '2', label: 'Regular' },
+                  { value: '3', label: 'Broken' }
+              ]
+            },
+            { name: 'moisture', label: 'Moisture Content (%)', type: 'text', required: false, placeholder: 'e.g., 14.5%' },
             { name: 'status', label: 'Status', type: 'select', required: true, defaultValue: 'completed',
               options: [
                   { value: 'pending', label: 'Pending' },
