@@ -88,22 +88,28 @@ router.post('/', async (req, res) => {
             });
         }
         
+        // Convert payment_reference to numeric value
+        let paymentRefValue = 0; // default to cash
+        if (payment_reference) {
+            if (payment_reference === 'cheque' || payment_reference === '1') {
+                paymentRefValue = 1;
+            } else if (payment_reference === 'balance' || payment_reference === '2') {
+                paymentRefValue = 2;
+            }
+        }
+        
         // Create real blockchain transaction
         const transactionData = {
-            transaction_id: `TXN-${Date.now()}`,
-            transaction_type: 'sale',
             from_actor_id: parseInt(from_actor_id),
             to_actor_id: parseInt(to_actor_id),
             batch_ids: batch_id ? [parseInt(batch_id)] : [],
             quantity: quantity || '0',
             unit_price: price_per_kg || '0.00',
-            total_amount: total_amount || '0.00',
-            payment_reference: payment_reference ? [payment_reference] : [],
+            payment_reference: paymentRefValue,
             transaction_date: new Date().toISOString(),
             status: status || 'completed',
             quality: quality !== undefined ? parseInt(quality) : null,
-            moisture: moisture || null,
-            notes: null
+            moisture: moisture || null
         };
         
         // Create real blockchain transaction
@@ -115,6 +121,7 @@ router.post('/', async (req, res) => {
                 ...transactionData,
                 publicKey: result.publicKey,
                 signature: result.signature,
+                blockchain_verified: true,
                 created_at: Date.now(),
                 updated_at: Date.now()
             },

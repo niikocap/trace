@@ -361,18 +361,25 @@ function renderRecentTransactions(transactions) {
         return;
     }
 
-    const transactionsList = transactions.map(tx => `
+    const transactionsList = transactions.map(tx => {
+        // Convert payment reference number to text
+        let paymentMethod = 'Cash';
+        if (tx.payment_reference === 1) paymentMethod = 'Cheque';
+        else if (tx.payment_reference === 2) paymentMethod = 'Balance';
+        
+        return `
         <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
             <div>
-                <div class="fw-medium text-success">${tx.transaction_type || 'Unknown'}</div>
-                <small class="text-muted">${tx.transaction_id || 'N/A'}</small>
+                <div class="fw-medium text-success">Transaction</div>
+                <small class="text-muted">${tx.publicKey ? tx.publicKey.substring(0, 8) + '...' : 'N/A'}</small>
             </div>
             <div class="text-end">
-                <div class="fw-medium">₱${tx.total_amount || '0.00'}</div>
+                <div class="fw-medium">${paymentMethod}</div>
                 <small class="text-muted">${formatDate(tx.transaction_date)}</small>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 
     container.innerHTML = transactionsList;
 }
@@ -540,9 +547,11 @@ function renderChainTransactionsTable(data) {
             </a>` : (transaction.to_actor_id || '-');
         
         // Format payment reference
-        let paymentRef = '-';
-        if (transaction.payment_reference && transaction.payment_reference.length > 0) {
-            paymentRef = transaction.payment_reference.join(', ');
+        let paymentRef = 'Cash';
+        if (transaction.payment_reference === 1) {
+            paymentRef = 'Cheque';
+        } else if (transaction.payment_reference === 2) {
+            paymentRef = 'Balance';
         }
         
         // Format moisture
@@ -553,7 +562,7 @@ function renderChainTransactionsTable(data) {
             <td>${fromActorLink}</td>
             <td>${toActorLink}</td>
             <td>${transaction.quantity || '-'}</td>
-            <td>₱${transaction.total_amount || '0.00'}</td>
+            <td>₱${(parseFloat(transaction.quantity || 0) * parseFloat(transaction.unit_price || 0)).toFixed(2)}</td>
             <td><span class="badge bg-secondary">${paymentRef}</span></td>
             <td>${moistureDisplay}</td>
             <td>${formatDate(transaction.transaction_date)}</td>
@@ -868,12 +877,11 @@ function getEntityFields(entityType) {
             { name: 'batch_id', label: 'Batch ID', type: 'select', required: false, options: transactionFormOptions.batches },
             { name: 'quantity', label: 'Quantity (kg)', type: 'number', required: false, placeholder: 'e.g., 100' },
             { name: 'price_per_kg', label: 'Price per KG', type: 'number', required: false },
-            { name: 'total_amount', label: 'Total Amount', type: 'number', required: false, placeholder: 'e.g., 5000.00' },
-            { name: 'payment_reference', label: 'Payment Reference', type: 'select', required: false,
+            { name: 'payment_reference', label: 'Payment Method', type: 'select', required: false,
               options: [
-                  { value: 'cheque', label: 'Cheque' },
-                  { value: 'cash', label: 'Cash' },
-                  { value: 'balance', label: 'Balance' }
+                  { value: '0', label: 'Cash' },
+                  { value: '1', label: 'Cheque' },
+                  { value: '2', label: 'Balance' }
               ]
             },
             { name: 'quality', label: 'Quality Grade', type: 'select', required: false,
@@ -987,8 +995,8 @@ function collectFormData() {
                     // Convert single batch ID to array
                     data[field.name] = [parseInt(value)];
                 } else if (field.name === 'payment_reference' && value) {
-                    // Convert to array
-                    data[field.name] = [value];
+                    // Convert to integer
+                    data[field.name] = parseInt(value);
                 } else if (field.name === 'transaction_date') {
                     // Use today's date
                     data[field.name] = new Date().toISOString().split('T')[0];
@@ -1465,21 +1473,30 @@ function renderSolanaTransactionsTable(data) {
     tbody.innerHTML = '';
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No Solana transactions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No Solana transactions found</td></tr>';
         return;
     }
 
     data.forEach(transaction => {
-        // Generate mock Solana transaction signature for demo purposes
-        const solanaSignature = generateMockSolanaSignature();
-        const explorerUrl = `https://explorer.solana.com/tx/${solanaSignature}?cluster=devnet`;
+        // Format payment reference
+        let paymentMethod = 'Cash';
+        if (transaction.payment_reference === 1) {
+            paymentMethod = 'Cheque';
+        } else if (transaction.payment_reference === 2) {
+            paymentMethod = 'Balance';
+        }
+        
+        const explorerUrl = `https://explorer.solana.com/address/${transaction.publicKey}?cluster=devnet`;
         
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td class="text-truncate">${transaction.transaction_id}</td>
-            <td class="text-truncate font-monospace">${solanaSignature}</td>
+            <td class="text-truncate font-monospace">${transaction.publicKey}</td>
+            <td>${transaction.from_actor_id || '-'}</td>
+            <td>${transaction.to_actor_id || '-'}</td>
+            <td>${transaction.quantity || '-'} kg</td>
+            <td><span class="badge bg-secondary">${paymentMethod}</span></td>
             <td>${formatDate(transaction.transaction_date)}</td>
-            <td><span class="badge bg-success">Confirmed</span></td>
+            <td><span class="badge ${transaction.blockchain_verified ? 'bg-success' : 'bg-warning'}">Verified</span></td>
             <td>
                 <a href="${explorerUrl}" target="_blank" class="btn btn-sm btn-outline-primary">
                     <i class="fas fa-external-link-alt me-1"></i>View on Explorer

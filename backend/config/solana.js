@@ -41,12 +41,9 @@ class SolanaService {
         }
     }
 
-    async getTransactionPDA(transactionId) {
-        const [pda] = await PublicKey.findProgramAddress(
-            [Buffer.from('transaction'), Buffer.from(transactionId)],
-            this.programId
-        );
-        return pda;
+    async getTransactionPDA() {
+        // Generate a random keypair for the transaction account
+        return Keypair.generate();
     }
     
     async createRealTransaction(transactionData) {
@@ -77,11 +74,8 @@ class SolanaService {
                 }
             }
             
-            // Get PDA for transaction
-            const [transactionPDA] = await PublicKey.findProgramAddress(
-                [Buffer.from('transaction'), Buffer.from(transactionData.transaction_id)],
-                this.programId
-            );
+            // Generate new keypair for transaction account
+            const transactionKeypair = Keypair.generate();
             
             // Create instruction data with correct discriminator
             const discriminator = Buffer.from([0xe3, 0xc1, 0x35, 0xef, 0x37, 0x7e, 0x70, 0x69]); // create_transaction discriminator
@@ -89,26 +83,22 @@ class SolanaService {
             // Create instruction data with proper Anchor format
             const instructionData = Buffer.concat([
                 discriminator,
-                this.serializeString(transactionData.transaction_id),
-                this.serializeString(transactionData.transaction_type),
                 this.serializeU64(transactionData.from_actor_id),
                 this.serializeU64(transactionData.to_actor_id),
                 this.serializeVecU64(transactionData.batch_ids || []),
                 this.serializeString(transactionData.quantity),
                 this.serializeString(transactionData.unit_price),
-                this.serializeString(transactionData.total_amount),
-                this.serializeVecString(transactionData.payment_reference || []),
+                this.serializeU8(transactionData.payment_reference),
                 this.serializeString(transactionData.transaction_date),
                 this.serializeString(transactionData.status),
                 this.serializeOptionU8(transactionData.quality),
-                this.serializeOption(transactionData.moisture),
-                this.serializeOption(transactionData.notes)
+                this.serializeOption(transactionData.moisture)
             ]);
             
             // Create transaction instruction
             const instruction = new TransactionInstruction({
                 keys: [
-                    { pubkey: transactionPDA, isSigner: false, isWritable: true },
+                    { pubkey: transactionKeypair.publicKey, isSigner: true, isWritable: true },
                     { pubkey: walletKeypair.publicKey, isSigner: true, isWritable: true },
                     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
                 ],
@@ -124,7 +114,7 @@ class SolanaService {
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = walletKeypair.publicKey;
             
-            const signature = await this.connection.sendTransaction(transaction, [walletKeypair], {
+            const signature = await this.connection.sendTransaction(transaction, [walletKeypair, transactionKeypair], {
                 commitment: 'confirmed',
                 preflightCommitment: 'confirmed'
             });
@@ -138,7 +128,7 @@ class SolanaService {
             
             return {
                 signature,
-                publicKey: transactionPDA.toString()
+                publicKey: transactionKeypair.publicKey.toString()
             };
         } catch (error) {
             console.error('Error creating real transaction:', error);
@@ -166,11 +156,8 @@ class SolanaService {
         return Buffer.concat([lengthBuffer, ...itemBuffers]);
     }
     
-    serializeVecString(vec) {
-        const lengthBuffer = Buffer.alloc(4);
-        lengthBuffer.writeUInt32LE(vec.length, 0);
-        const itemBuffers = vec.map(item => this.serializeString(item));
-        return Buffer.concat([lengthBuffer, ...itemBuffers]);
+    serializeU8(num) {
+        return Buffer.from([num]);
     }
     
     serializeOption(value) {
@@ -199,7 +186,7 @@ class SolanaService {
                 try {
                     // Try to decode the account data
                     const decoded = this.decodeTransactionAccount(account.account.data);
-                    if (decoded && decoded.transaction_id) {
+                    if (decoded && decoded.from_actor_id !== undefined) {
                         transactions.push({
                             publicKey: account.pubkey.toString(),
                             ...decoded,
@@ -259,22 +246,6 @@ class SolanaService {
             
             let offset = 8; // Skip discriminator
             
-            // Read transaction_id (String)
-            if (offset + 4 > data.length) return null;
-            const transactionIdLength = data.readUInt32LE(offset);
-            offset += 4;
-            if (offset + transactionIdLength > data.length) return null;
-            const transaction_id = data.subarray(offset, offset + transactionIdLength).toString('utf8');
-            offset += transactionIdLength;
-            
-            // Read transaction_type (String)
-            if (offset + 4 > data.length) return null;
-            const transactionTypeLength = data.readUInt32LE(offset);
-            offset += 4;
-            if (offset + transactionTypeLength > data.length) return null;
-            const transaction_type = data.subarray(offset, offset + transactionTypeLength).toString('utf8');
-            offset += transactionTypeLength;
-            
             // Read from_actor_id (u64)
             if (offset + 8 > data.length) return null;
             const from_actor_id = Number(data.readBigUInt64LE(offset));
@@ -312,27 +283,10 @@ class SolanaService {
             const unit_price = data.subarray(offset, offset + unitPriceLength).toString('utf8');
             offset += unitPriceLength;
             
-            // Read total_amount (String)
-            if (offset + 4 > data.length) return null;
-            const totalAmountLength = data.readUInt32LE(offset);
-            offset += 4;
-            if (offset + totalAmountLength > data.length) return null;
-            const total_amount = data.subarray(offset, offset + totalAmountLength).toString('utf8');
-            offset += totalAmountLength;
-            
-            // Read payment_reference (Vec<String>)
-            if (offset + 4 > data.length) return null;
-            const paymentRefLength = data.readUInt32LE(offset);
-            offset += 4;
-            const payment_reference = [];
-            for (let i = 0; i < paymentRefLength; i++) {
-                if (offset + 4 > data.length) return null;
-                const strLength = data.readUInt32LE(offset);
-                offset += 4;
-                if (offset + strLength > data.length) return null;
-                payment_reference.push(data.subarray(offset, offset + strLength).toString('utf8'));
-                offset += strLength;
-            }
+            // Read payment_reference (u8)
+            if (offset + 1 > data.length) return null;
+            const payment_reference = data.readUInt8(offset);
+            offset += 1;
             
             // Read transaction_date (String)
             if (offset + 4 > data.length) return null;
@@ -375,34 +329,17 @@ class SolanaService {
                 offset += moistureLength;
             }
             
-            // Read notes (Option<String>)
-            if (offset + 1 > data.length) return null;
-            const hasNotes = data.readUInt8(offset);
-            offset += 1;
-            let notes = null;
-            if (hasNotes === 1) {
-                if (offset + 4 > data.length) return null;
-                const notesLength = data.readUInt32LE(offset);
-                offset += 4;
-                if (offset + notesLength > data.length) return null;
-                notes = data.subarray(offset, offset + notesLength).toString('utf8');
-            }
-            
             return {
-                transaction_id,
-                transaction_type,
                 from_actor_id,
                 to_actor_id,
                 batch_ids,
                 quantity,
                 unit_price,
-                total_amount,
                 payment_reference,
                 transaction_date,
                 status,
                 quality,
-                moisture,
-                notes
+                moisture
             };
         } catch (error) {
             console.error('Error decoding transaction account:', error);
