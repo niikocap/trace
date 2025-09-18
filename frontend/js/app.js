@@ -866,7 +866,9 @@ function getEntityFields(entityType) {
             { name: 'from_actor_id', label: 'From Actor', type: 'select', required: true, options: transactionFormOptions.actors },
             { name: 'to_actor_id', label: 'To Actor', type: 'select', required: true, options: transactionFormOptions.actors },
             { name: 'batch_id', label: 'Batch ID', type: 'select', required: false, options: transactionFormOptions.batches },
+            { name: 'quantity', label: 'Quantity (kg)', type: 'number', required: false, placeholder: 'e.g., 100' },
             { name: 'price_per_kg', label: 'Price per KG', type: 'number', required: false },
+            { name: 'total_amount', label: 'Total Amount', type: 'number', required: false, placeholder: 'e.g., 5000.00' },
             { name: 'payment_reference', label: 'Payment Reference', type: 'select', required: false,
               options: [
                   { value: 'cheque', label: 'Cheque' },

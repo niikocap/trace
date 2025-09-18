@@ -118,10 +118,23 @@ class SolanaService {
             
             // Create and send transaction
             const transaction = new Transaction().add(instruction);
+            
+            // Get recent blockhash
+            const { blockhash } = await this.connection.getLatestBlockhash();
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = walletKeypair.publicKey;
+            
             const signature = await this.connection.sendTransaction(transaction, [walletKeypair], {
-                commitment: 'confirmed'
+                commitment: 'confirmed',
+                preflightCommitment: 'confirmed'
             });
-            await this.connection.confirmTransaction(signature, 'confirmed');
+            
+            // Wait for confirmation with timeout
+            const confirmation = await this.connection.confirmTransaction({
+                signature,
+                blockhash,
+                lastValidBlockHeight: (await this.connection.getLatestBlockhash()).lastValidBlockHeight
+            }, 'confirmed');
             
             return {
                 signature,
