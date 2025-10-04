@@ -187,8 +187,20 @@ class SolanaService {
                     // Try to decode the account data
                     const decoded = this.decodeTransactionAccount(account.account.data);
                     if (decoded && decoded.from_actor_id !== undefined) {
+                        // Get transaction signatures for this account
+                        let signature = null;
+                        try {
+                            const signatures = await this.connection.getSignaturesForAddress(account.pubkey, { limit: 1 });
+                            if (signatures && signatures.length > 0) {
+                                signature = signatures[0].signature;
+                            }
+                        } catch (sigError) {
+                            console.warn('Could not fetch signature for account:', account.pubkey.toString());
+                        }
+                        
                         transactions.push({
                             publicKey: account.pubkey.toString(),
+                            signature: signature || account.pubkey.toString(), // fallback to pubkey if no signature
                             ...decoded,
                             blockchain_verified: true,
                             lamports: account.account.lamports,

@@ -114,8 +114,7 @@ function setupSearchListeners() {
         'seasons-search', 
         'batches-search',
         'milled-search',
-        'transactions-search',
-        'solana-transactions-search'
+        'transactions-search'
     ];
 
     searchInputs.forEach(inputId => {
@@ -152,7 +151,6 @@ function showSection(section) {
         'rice-batches': 'Rice Batches',
         'milled-rice': 'Milled Rice',
         'chain-transactions': 'Chain Transactions',
-        'solana-transactions': 'Solana Transactions',
         'api-tester': 'API Tester',
         'batch-tracker': 'Batch Tracker'
     };
@@ -160,7 +158,7 @@ function showSection(section) {
     document.getElementById('page-title').textContent = titles[section];
     
     const addBtn = document.getElementById('add-btn');
-    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker' || section === 'solana-transactions') {
+    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker') {
         addBtn.style.display = 'none';
     } else {
         addBtn.style.display = 'block';
@@ -188,9 +186,6 @@ function showSection(section) {
             break;
         case 'chain-transactions':
             loadChainTransactions();
-            break;
-        case 'solana-transactions':
-            loadSolanaTransactions();
             break;
         case 'api-tester':
             initializeApiTester();
@@ -326,20 +321,6 @@ async function loadChainTransactions() {
     }
 }
 
-// Load Solana transactions for separate page
-async function loadSolanaTransactions() {
-    try {
-        showLoading(true);
-        const response = await fetchData('/transactions');
-        const transactions = response.data || [];
-        renderSolanaTransactionsTable(transactions);
-    } catch (error) {
-        console.error('Error loading Solana transactions:', error);
-        showToast('Error loading Solana transactions', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
 
 async function loadRecentTransactions() {
     try {
@@ -567,6 +548,11 @@ function renderChainTransactionsTable(data) {
             <td>${moistureDisplay}</td>
             <td>${formatDate(transaction.transaction_date)}</td>
             <td><span class="badge ${getStatusBadgeClass(transaction.status)}">${transaction.status}</span></td>
+            <td>
+                ${transaction.signature ? `<a href="https://explorer.solana.com/tx/${transaction.signature}?cluster=devnet" target="_blank" class="btn btn-sm btn-outline-primary" title="View on Solana Explorer">
+                    <i class="fas fa-external-link-alt"></i>
+                </a>` : '-'}
+            </td>
         `;
         tbody.appendChild(row);
     });
@@ -1467,55 +1453,6 @@ function displayBatchDetails(batch, millingData, transactions) {
     }
 }
 
-// Function to render Solana transaction IDs table
-function renderSolanaTransactionsTable(data) {
-    const tbody = document.getElementById('solana-transactions-tbody');
-    tbody.innerHTML = '';
-
-    if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No Solana transactions found</td></tr>';
-        return;
-    }
-
-    data.forEach(transaction => {
-        // Format payment reference
-        let paymentMethod = 'Cash';
-        if (transaction.payment_reference === 1) {
-            paymentMethod = 'Cheque';
-        } else if (transaction.payment_reference === 2) {
-            paymentMethod = 'Balance';
-        }
-        
-        const explorerUrl = `https://explorer.solana.com/address/${transaction.publicKey}?cluster=devnet`;
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="text-truncate font-monospace">${transaction.publicKey}</td>
-            <td>${transaction.from_actor_id || '-'}</td>
-            <td>${transaction.to_actor_id || '-'}</td>
-            <td>${transaction.quantity || '-'} kg</td>
-            <td><span class="badge bg-secondary">${paymentMethod}</span></td>
-            <td>${formatDate(transaction.transaction_date)}</td>
-            <td><span class="badge ${transaction.blockchain_verified ? 'bg-success' : 'bg-warning'}">Verified</span></td>
-            <td>
-                <a href="${explorerUrl}" target="_blank" class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-external-link-alt me-1"></i>View on Explorer
-                </a>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
-}
-
-// Generate mock Solana transaction signature
-function generateMockSolanaSignature() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 88; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-}
 
 // Function to show actor information modal
 async function showActorInfo(actorId) {
