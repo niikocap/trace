@@ -1,0 +1,19 @@
+[
+  {
+    "publicKey": "AR5yBGQN1es2YAXavxt8ZNpsCZvFfNuYpBXMFryX2Wyz",
+    "signature": "JX4AbE9wqn685g4aGQAHEMthFjhhrB8HG2tdSUKUTP3j5w88tTPFdDf1bPVhiPJcjPunR3Y5STTLMKYxD1J4nfH",
+    "from_actor_id": 1,
+    "to_actor_id": 2,
+    "batch_ids": [],
+    "quantity": "200",
+    "unit_price": "0.00",
+    "payment_reference": 1,
+    "transaction_date": "2025-10-05T00:27:59.404Z",
+    "status": "completed",
+    "quality": "premium",
+    "moisture": "12%",
+    "created_at": "2025-10-05T00:28:02.341Z",
+    "updated_at": "2025-10-05T00:28:02.341Z",
+    "blockchain_verified": true
+  }
+]

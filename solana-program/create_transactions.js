@@ -1,13 +1,13 @@
 const anchor = require('@coral-xyz/anchor');
-const { Connection, Keypair, PublicKey } = require('@solana/web3.js');
+const { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction, clusterApiUrl } = require('@solana/web3.js');
 const fs = require('fs');
 
 // Load the IDL
 const idl = JSON.parse(fs.readFileSync('./target/idl/rice_supply_chain.json', 'utf8'));
 
 async function createTransactions() {
-    // Connect to local validator
-    const connection = new Connection('http://127.0.0.1:8899', 'confirmed');
+    // Connect to devnet
+    const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
     
     // Load wallet
     const walletKeypair = Keypair.fromSecretKey(
@@ -24,7 +24,7 @@ async function createTransactions() {
     
     console.log('Creating real blockchain transactions...');
     
-    // Transaction 1: Rice purchase from farmer
+    // Transaction 1: Rice purchase from farmer (with Memo)
     const tx1Id = 'TRANS001';
     const [tx1PDA] = await PublicKey.findProgramAddress(
         [Buffer.from('transaction'), Buffer.from(tx1Id)],
@@ -32,7 +32,8 @@ async function createTransactions() {
     );
     
     try {
-        const tx1 = await program.methods
+        // Build main instruction
+        const mainIx = await program.methods
             .createTransaction(
                 tx1Id,
                 'purchase',
@@ -50,11 +51,35 @@ async function createTransactions() {
             .accounts({
                 transaction: tx1PDA,
                 authority: wallet.publicKey,
-                systemProgram: anchor.web3.SystemProgram.programId,
+                systemProgram: SystemProgram.programId,
             })
-            .rpc();
-        
-        console.log('Transaction 1 created:', tx1);
+            .instruction();
+
+        // Build memo instruction with readable JSON
+        const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+        const memoPayload = JSON.stringify({
+            transaction_id: tx1Id,
+            transaction_type: 'purchase',
+            from_actor_id: 1,
+            to_actor_id: 2,
+            batch_ids: [1],
+            quantity: '1000',
+            unit_price: '2.50',
+            total_amount: '2500.00',
+            payment_reference: ['PAY001'],
+            transaction_date: new Date().toISOString(),
+            status: 'completed',
+            notes: 'Rice purchase from farmer'
+        });
+        const memoIx = new TransactionInstruction({
+            programId: MEMO_PROGRAM_ID,
+            keys: [],
+            data: Buffer.from(memoPayload, 'utf8'),
+        });
+
+        const tx = new Transaction().add(mainIx, memoIx);
+        const sig = await provider.sendAndConfirm(tx);
+        console.log('Transaction 1 created (with memo):', sig);
         console.log('Transaction 1 PDA:', tx1PDA.toString());
     } catch (error) {
         console.log('Transaction 1 already exists or error:', error.message);

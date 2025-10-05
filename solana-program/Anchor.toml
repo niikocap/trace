@@ -3,10 +3,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-rice_supply_chain = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+rice_supply_chain = "FS1fWouL7tpGRTErvRcdcWpgU2BsSuTfbEpEDBufWF1N"
 
 [programs.devnet]
-rice_supply_chain = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+rice_supply_chain = "FS1fWouL7tpGRTErvRcdcWpgU2BsSuTfbEpEDBufWF1N"
 
 [registry]
 url = "https://api.apr.dev"

@@ -28,12 +28,36 @@ function initializeApiTester() {
     const currentDomain = `${window.location.protocol}//${window.location.host}`;
     const apiUrlInput = document.getElementById('api-url');
     const endpointSelect = document.getElementById('api-endpoint');
+    const methodSelect = document.getElementById('api-method');
+    const requestBodySection = document.getElementById('request-body-section');
+    const headersTextarea = document.getElementById('api-headers');
+    const bodyTextarea = document.getElementById('api-body');
     
     if (!apiUrlInput || !endpointSelect) return; // Elements may not exist yet
     
     function updateApiUrl() {
         const selectedEndpoint = endpointSelect.value;
         apiUrlInput.value = `${currentDomain}/api${selectedEndpoint}`;
+
+        // If user selects the sample transactions endpoint, auto-switch to POST and prefill body
+        if (selectedEndpoint === '/api/transactions/sample') {
+            if (methodSelect) methodSelect.value = 'POST';
+            if (requestBodySection) requestBodySection.style.display = 'block';
+            if (headersTextarea && !headersTextarea.value) {
+                headersTextarea.value = JSON.stringify({ 'Content-Type': 'application/json' }, null, 2);
+            }
+            if (bodyTextarea) {
+                bodyTextarea.value = JSON.stringify({
+                    from_actor_id: 1,
+                    to_actor_id: 2,
+                    quantity: '50kg',
+                    unit_price: '200',
+                    payment_reference: 0,
+                    transaction_date: new Date().toISOString(),
+                    status: 'completed'
+                }, null, 2);
+            }
+        }
     }
     
     // Set initial URL
@@ -43,9 +67,6 @@ function initializeApiTester() {
     endpointSelect.addEventListener('change', updateApiUrl);
     
     // Update method dropdown change handler
-    const methodSelect = document.getElementById('api-method');
-    const requestBodySection = document.getElementById('request-body-section');
-    
     if (methodSelect && requestBodySection) {
         methodSelect.addEventListener('change', function() {
             if (this.value === 'POST' || this.value === 'PUT') {
@@ -538,6 +559,13 @@ function renderChainTransactionsTable(data) {
         // Format moisture
         const moistureDisplay = transaction.moisture || '-';
         
+        // Add JSON data display for transparency
+        const jsonDataDisplay = transaction.json_data ? 
+            `<button class="btn btn-sm btn-info" onclick="showJsonData('${transaction.publicKey}', '${encodeURIComponent(transaction.json_data)}')" title="View Raw JSON Data">
+                <i class="fas fa-code"></i> JSON
+            </button>` : 
+            `<span class="badge bg-warning">Binary</span>`;
+
         row.innerHTML = `
             <td>${batchDisplay}</td>
             <td>${fromActorLink}</td>
@@ -548,6 +576,7 @@ function renderChainTransactionsTable(data) {
             <td>${moistureDisplay}</td>
             <td>${formatDate(transaction.transaction_date)}</td>
             <td><span class="badge ${getStatusBadgeClass(transaction.status)}">${transaction.status}</span></td>
+            <td>${jsonDataDisplay}</td>
             <td>
                 ${transaction.signature ? `<a href="https://explorer.solana.com/tx/${transaction.signature}?cluster=devnet" target="_blank" class="btn btn-sm btn-outline-primary" title="View on Solana Explorer">
                     <i class="fas fa-external-link-alt"></i>
@@ -555,6 +584,80 @@ function renderChainTransactionsTable(data) {
             </td>
         `;
         tbody.appendChild(row);
+    });
+}
+
+// Show JSON Data Modal
+function showJsonData(publicKey, encodedJsonData) {
+    const jsonData = decodeURIComponent(encodedJsonData);
+    
+    // Create modal HTML
+    const modalHtml = `
+        <div class="modal fade" id="jsonDataModal" tabindex="-1" aria-labelledby="jsonDataModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="jsonDataModalLabel">
+                            <i class="fas fa-code me-2"></i>Raw JSON Data - Transaction ${publicKey.substring(0, 8)}...
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            This is the raw JSON data stored transparently on the Solana blockchain.
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Public Key:</label>
+                            <input type="text" class="form-control" value="${publicKey}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Raw JSON Data:</label>
+                            <textarea class="form-control" rows="15" readonly style="font-family: monospace; font-size: 12px;">${JSON.stringify(JSON.parse(jsonData), null, 2)}</textarea>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary" onclick="copyToClipboard('${publicKey}')">
+                                <i class="fas fa-copy me-1"></i>Copy Public Key
+                            </button>
+                            <button type="button" class="btn btn-outline-success" onclick="copyToClipboard('${encodedJsonData}')">
+                                <i class="fas fa-copy me-1"></i>Copy JSON Data
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('jsonDataModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('jsonDataModal'));
+    modal.show();
+    
+    // Clean up modal after it's hidden
+    document.getElementById('jsonDataModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
+
+// Copy to clipboard function
+function copyToClipboard(text) {
+    const decodedText = text.startsWith('http') ? text : decodeURIComponent(text);
+    navigator.clipboard.writeText(decodedText).then(() => {
+        showToast('Copied to clipboard!', 'success');
+    }).catch(() => {
+        showToast('Failed to copy to clipboard', 'error');
     });
 }
 

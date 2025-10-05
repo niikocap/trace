@@ -26,6 +26,44 @@ router.get('/', async (req, res) => {
     }
 });
 
+// POST /api/transactions/sample - Create a sample transaction (with Memo)
+router.post('/sample', async (req, res) => {
+    try {
+        // Fixed sample based on user request
+        const sampleData = {
+            from_actor_id: 1,
+            to_actor_id: 2,
+            quantity: '50kg',
+            unit_price: '200',
+            payment_reference: 0,
+            transaction_date: new Date().toISOString(),
+            status: 'completed'
+        };
+
+        const result = await solanaService.createRealTransaction(sampleData);
+
+        return res.status(201).json({
+            success: true,
+            data: {
+                ...sampleData,
+                publicKey: result.publicKey,
+                signature: result.signature,
+                blockchain_verified: true,
+                created_at: Date.now(),
+                updated_at: Date.now()
+            },
+            message: 'Sample transaction created successfully on blockchain (with Memo)'
+        });
+    } catch (error) {
+        console.error('Error creating sample transaction:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to create sample transaction on blockchain',
+            message: error.message
+        });
+    }
+});
+
 // GET /api/transactions/pubkey/:publicKey - Get transactions by public key
 router.get('/pubkey/:publicKey', async (req, res) => {
     try {

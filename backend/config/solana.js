@@ -1,5 +1,6 @@
 const { Connection, PublicKey, clusterApiUrl, Keypair, SystemProgram, Transaction, TransactionInstruction } = require('@solana/web3.js');
-const { AnchorProvider, Program, Idl, BN } = require('@coral-xyz/anchor');
+const anchor = require('@coral-xyz/anchor');
+const { AnchorProvider, Program } = require('@coral-xyz/anchor');
 const fs = require('fs');
 const path = require('path');
 
@@ -76,38 +77,35 @@ class SolanaService {
             
             // Generate new keypair for transaction account
             const transactionKeypair = Keypair.generate();
+
+            // Setup Anchor provider and program using IDL
+            const wallet = new anchor.Wallet(walletKeypair);
+            const provider = new AnchorProvider(this.connection, wallet, { commitment: SOLANA_CONFIG.commitment });
+            const idlPath = path.join(__dirname, '../../solana-program/target/idl/rice_supply_chain.json');
+            const idl = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
+            const program = new Program(idl, this.programId, provider);
+
+            // Build main instruction via Anchor (passing JSON string)
+            const jsonData = JSON.stringify(transactionData);
+            const instruction = await program.methods
+                .createTransaction(jsonData)
+                .accounts({
+                    transaction: transactionKeypair.publicKey,
+                    authority: wallet.publicKey,
+                    systemProgram: SystemProgram.programId,
+                })
+                .instruction();
             
-            // Create instruction data with correct discriminator
-            const discriminator = Buffer.from([0xe3, 0xc1, 0x35, 0xef, 0x37, 0x7e, 0x70, 0x69]); // create_transaction discriminator
-            
-            // Create instruction data with proper Anchor format
-            const instructionData = Buffer.concat([
-                discriminator,
-                this.serializeU64(transactionData.from_actor_id),
-                this.serializeU64(transactionData.to_actor_id),
-                this.serializeVecU64(transactionData.batch_ids || []),
-                this.serializeString(transactionData.quantity),
-                this.serializeString(transactionData.unit_price),
-                this.serializeU8(transactionData.payment_reference),
-                this.serializeString(transactionData.transaction_date),
-                this.serializeString(transactionData.status),
-                this.serializeOptionU8(transactionData.quality),
-                this.serializeOption(transactionData.moisture)
-            ]);
-            
-            // Create transaction instruction
-            const instruction = new TransactionInstruction({
-                keys: [
-                    { pubkey: transactionKeypair.publicKey, isSigner: true, isWritable: true },
-                    { pubkey: walletKeypair.publicKey, isSigner: true, isWritable: true },
-                    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-                ],
-                programId: this.programId,
-                data: instructionData,
+            // Create Memo program instruction to attach readable JSON
+            const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+            const memoInstruction = new TransactionInstruction({
+                programId: MEMO_PROGRAM_ID,
+                keys: [],
+                data: Buffer.from(jsonData, 'utf8'),
             });
-            
-            // Create and send transaction
-            const transaction = new Transaction().add(instruction);
+
+            // Create and send transaction (main ix + memo ix)
+            const transaction = new Transaction().add(instruction, memoInstruction);
             
             // Get recent blockhash
             const { blockhash } = await this.connection.getLatestBlockhash();
@@ -243,115 +241,43 @@ class SolanaService {
                 return null;
             }
             
-            // Try simple JSON parsing first (for test data)
-            try {
-                const dataString = data.toString('utf8').replace(/\0/g, '');
-                if (dataString.startsWith('{')) {
-                    const parsed = JSON.parse(dataString);
-                    if (parsed.transaction_id) {
-                        return parsed;
-                    }
-                }
-            } catch (e) {
-                // Not JSON, continue with Anchor decoding
-            }
-            
             let offset = 8; // Skip discriminator
             
-            // Read from_actor_id (u64)
+            // Read JSON string length
+            if (offset + 4 > data.length) return null;
+            const jsonLength = data.readUInt32LE(offset);
+            offset += 4;
+            
+            // Read JSON string
+            if (offset + jsonLength > data.length) return null;
+            const jsonString = data.subarray(offset, offset + jsonLength).toString('utf8');
+            offset += jsonLength;
+            
+            // Parse JSON data
+            let transactionData;
+            try {
+                transactionData = JSON.parse(jsonString);
+            } catch (parseError) {
+                console.error('Failed to parse JSON from blockchain:', parseError);
+                return null;
+            }
+            
+            // Read timestamps
             if (offset + 8 > data.length) return null;
-            const from_actor_id = Number(data.readBigUInt64LE(offset));
+            const created_at = Number(data.readBigInt64LE(offset));
             offset += 8;
             
-            // Read to_actor_id (u64)
             if (offset + 8 > data.length) return null;
-            const to_actor_id = Number(data.readBigUInt64LE(offset));
+            const updated_at = Number(data.readBigInt64LE(offset));
             offset += 8;
             
-            // Read batch_ids (Vec<u64>)
-            if (offset + 4 > data.length) return null;
-            const batchIdsLength = data.readUInt32LE(offset);
-            offset += 4;
-            const batch_ids = [];
-            for (let i = 0; i < batchIdsLength; i++) {
-                if (offset + 8 > data.length) return null;
-                batch_ids.push(Number(data.readBigUInt64LE(offset)));
-                offset += 8;
-            }
-            
-            // Read quantity (String)
-            if (offset + 4 > data.length) return null;
-            const quantityLength = data.readUInt32LE(offset);
-            offset += 4;
-            if (offset + quantityLength > data.length) return null;
-            const quantity = data.subarray(offset, offset + quantityLength).toString('utf8');
-            offset += quantityLength;
-            
-            // Read unit_price (String)
-            if (offset + 4 > data.length) return null;
-            const unitPriceLength = data.readUInt32LE(offset);
-            offset += 4;
-            if (offset + unitPriceLength > data.length) return null;
-            const unit_price = data.subarray(offset, offset + unitPriceLength).toString('utf8');
-            offset += unitPriceLength;
-            
-            // Read payment_reference (u8)
-            if (offset + 1 > data.length) return null;
-            const payment_reference = data.readUInt8(offset);
-            offset += 1;
-            
-            // Read transaction_date (String)
-            if (offset + 4 > data.length) return null;
-            const transactionDateLength = data.readUInt32LE(offset);
-            offset += 4;
-            if (offset + transactionDateLength > data.length) return null;
-            const transaction_date = data.subarray(offset, offset + transactionDateLength).toString('utf8');
-            offset += transactionDateLength;
-            
-            // Read status (String)
-            if (offset + 4 > data.length) return null;
-            const statusLength = data.readUInt32LE(offset);
-            offset += 4;
-            if (offset + statusLength > data.length) return null;
-            const status = data.subarray(offset, offset + statusLength).toString('utf8');
-            offset += statusLength;
-            
-            // Read quality (Option<u8>)
-            if (offset + 1 > data.length) return null;
-            const hasQuality = data.readUInt8(offset);
-            offset += 1;
-            let quality = null;
-            if (hasQuality === 1) {
-                if (offset + 1 > data.length) return null;
-                quality = data.readUInt8(offset);
-                offset += 1;
-            }
-            
-            // Read moisture (Option<String>)
-            if (offset + 1 > data.length) return null;
-            const hasMoisture = data.readUInt8(offset);
-            offset += 1;
-            let moisture = null;
-            if (hasMoisture === 1) {
-                if (offset + 4 > data.length) return null;
-                const moistureLength = data.readUInt32LE(offset);
-                offset += 4;
-                if (offset + moistureLength > data.length) return null;
-                moisture = data.subarray(offset, offset + moistureLength).toString('utf8');
-                offset += moistureLength;
-            }
-            
+            // Add metadata
             return {
-                from_actor_id,
-                to_actor_id,
-                batch_ids,
-                quantity,
-                unit_price,
-                payment_reference,
-                transaction_date,
-                status,
-                quality,
-                moisture
+                ...transactionData,
+                created_at,
+                updated_at,
+                json_data: jsonString, // Include raw JSON for transparency
+                data_format: 'json' // Mark as JSON format for frontend
             };
         } catch (error) {
             console.error('Error decoding transaction account:', error);
