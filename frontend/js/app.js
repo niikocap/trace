@@ -29,7 +29,7 @@ function initializeApiTester() {
     const apiUrlInput = document.getElementById('api-url');
     const endpointSelect = document.getElementById('api-endpoint');
     const methodSelect = document.getElementById('api-method');
-    const requestBodySection = document.getElementById('request-body-section');
+    const requestBodySection = document.getElementById('request-body-table-section');
     const headersTextarea = document.getElementById('api-headers');
     const bodyTextarea = document.getElementById('api-body');
     
@@ -37,44 +37,199 @@ function initializeApiTester() {
     
     function updateApiUrl() {
         const selectedEndpoint = endpointSelect.value;
-        apiUrlInput.value = `${currentDomain}/api${selectedEndpoint}`;
+        apiUrlInput.value = `${currentDomain}${selectedEndpoint}`;
 
-        // If user selects the sample transactions endpoint, auto-switch to POST and prefill body
+        // Auto-set POST method and initialize params for sample transaction
         if (selectedEndpoint === '/api/transactions/sample') {
             if (methodSelect) methodSelect.value = 'POST';
-            if (requestBodySection) requestBodySection.style.display = 'block';
             if (headersTextarea && !headersTextarea.value) {
                 headersTextarea.value = JSON.stringify({ 'Content-Type': 'application/json' }, null, 2);
             }
-            if (bodyTextarea) {
-                bodyTextarea.value = JSON.stringify({
-                    from_actor_id: 1,
-                    to_actor_id: 2,
-                    quantity: '50kg',
-                    unit_price: '200',
-                    payment_reference: 0,
-                    transaction_date: new Date().toISOString(),
-                    status: 'completed'
-                }, null, 2);
-            }
+            initializeDefaultParams();
         }
+        
+        // Update body section visibility
+        updateBodySectionVisibility();
     }
     
     // Set initial URL
     updateApiUrl();
     
     // Update URL when endpoint changes
-    endpointSelect.addEventListener('change', updateApiUrl);
+    endpointSelect.addEventListener('change', function() {
+        updateApiUrl();
+        updateBodySectionVisibility();
+    });
+    
+    // Initialize default parameters for sample transaction
+    function initializeDefaultParams() {
+        const tableBody = document.getElementById('params-table-body');
+        if (!tableBody) return;
+        
+        // Clear existing params
+        tableBody.innerHTML = '';
+        
+        // Default parameters for sample transaction
+        const defaultParams = [
+            { key: 'from_actor_id', value: '1' },
+            { key: 'to_actor_id', value: '2' },
+            { key: 'quantity', value: '50kg' },
+            { key: 'unit_price', value: '200' },
+            { key: 'payment_reference', value: '0' },
+            { key: 'status', value: 'completed' }
+        ];
+        
+        defaultParams.forEach(param => {
+            addParameterRow(param.key, param.value, false);
+        });
+    }
+    
+    // Add parameter row
+    function addParameterRow(key = '', value = '', isEditable = true) {
+        const tableBody = document.getElementById('params-table-body');
+        if (!tableBody) return;
+        
+        const paramRow = document.createElement('tr');
+        paramRow.className = 'param-row';
+        paramRow.innerHTML = `
+            <td>
+                <input type="text" class="form-control param-key" placeholder="Parameter name" value="${key}" ${isEditable ? '' : 'readonly'}>
+            </td>
+            <td>
+                <input type="text" class="form-control param-value" placeholder="Enter value here..." value="${value}">
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-outline-danger btn-sm remove-param-btn" title="Remove parameter">
+                    <i class="fas fa-times"></i>
+                </button>
+            </td>
+        `;
+        
+        // Add remove functionality
+        paramRow.querySelector('.remove-param-btn').addEventListener('click', function() {
+            paramRow.remove();
+        });
+        
+        tableBody.appendChild(paramRow);
+    }
+    
+    // Setup add parameter button
+    const addParamBtn = document.getElementById('add-param-btn');
+    if (addParamBtn) {
+        addParamBtn.addEventListener('click', function() {
+            addParameterRow('', '', true); // Allow editing for manually added parameters
+        });
+    }
     
     // Update method dropdown change handler
-    if (methodSelect && requestBodySection) {
+    if (methodSelect) {
         methodSelect.addEventListener('change', function() {
-            if (this.value === 'POST' || this.value === 'PUT') {
-                requestBodySection.style.display = 'block';
-            } else {
-                requestBodySection.style.display = 'none';
-            }
+            updateBodySectionVisibility();
         });
+    }
+    
+    // Function to update body section visibility
+    function updateBodySectionVisibility() {
+        const requestBodyTableSection = document.getElementById('request-body-table-section');
+        const method = methodSelect.value;
+        
+        if (method === 'POST' || method === 'PUT') {
+            // Show parameter table for ALL POST/PUT requests
+            if (requestBodyTableSection) {
+                requestBodyTableSection.style.display = 'block';
+                // Only initialize default params for sample transaction
+                const selectedEndpoint = endpointSelect.value;
+                if (selectedEndpoint === '/api/transactions/sample') {
+                    initializeDefaultParams();
+                } else {
+                    // Auto-populate parameters based on endpoint
+                    initializeEndpointParams();
+                }
+            }
+            if (requestBodySection) requestBodySection.style.display = 'none';
+        } else {
+            if (requestBodyTableSection) requestBodyTableSection.style.display = 'none';
+            if (requestBodySection) requestBodySection.style.display = 'none';
+        }
+    }
+    
+    // Initialize parameters based on endpoint
+    function initializeEndpointParams() {
+        const tableBody = document.getElementById('params-table-body');
+        if (!tableBody) return;
+        
+        // Clear existing params
+        tableBody.innerHTML = '';
+        
+        const selectedEndpoint = endpointSelect.value;
+        let params = [];
+        
+        switch (selectedEndpoint) {
+            case '/api/chain-actors':
+                params = [
+                    { key: 'name', value: '', description: 'Actor name' },
+                    { key: 'type', value: '', description: 'farmer/miller/trader' },
+                    { key: 'contact_info', value: '', description: 'Contact details' },
+                    { key: 'location', value: '', description: 'Location' },
+                    { key: 'group', value: '', description: 'Group name' },
+                    { key: 'farmer_id', value: '', description: 'Farmer ID' }
+                ];
+                break;
+            case '/api/production-seasons':
+                params = [
+                    { key: 'season_name', value: '', description: 'Season name' },
+                    { key: 'planting_date', value: '', description: 'YYYY-MM-DD' },
+                    { key: 'harvesting_date', value: '', description: 'YYYY-MM-DD' },
+                    { key: 'variety', value: '', description: 'Rice variety' },
+                    { key: 'carbon_certified', value: '', description: 'true/false' },
+                    { key: 'farmer_id', value: '', description: 'Farmer ID' }
+                ];
+                break;
+            case '/api/rice-batches':
+                params = [
+                    { key: 'batch_number', value: '', description: 'Batch number' },
+                    { key: 'farmer_id', value: '', description: 'Farmer ID' },
+                    { key: 'rice_variety', value: '', description: 'Rice variety' },
+                    { key: 'harvest_date', value: '', description: 'YYYY-MM-DD' },
+                    { key: 'quantity_harvested', value: '', description: 'Quantity' },
+                    { key: 'quality_grade', value: '', description: 'Quality grade' }
+                ];
+                break;
+            case '/api/milled-rice':
+                params = [
+                    { key: 'batch_id', value: '', description: 'Batch ID' },
+                    { key: 'miller_id', value: '', description: 'Miller ID' },
+                    { key: 'milling_date', value: '', description: 'YYYY-MM-DD' },
+                    { key: 'input_quantity', value: '', description: 'Input quantity' },
+                    { key: 'output_quantity', value: '', description: 'Output quantity' }
+                ];
+                break;
+            case '/api/transactions':
+                params = [
+                    { key: 'from_actor_id', value: '', description: 'From actor ID' },
+                    { key: 'to_actor_id', value: '', description: 'To actor ID' },
+                    { key: 'quantity', value: '', description: 'Quantity' },
+                    { key: 'unit_price', value: '', description: 'Unit price' },
+                    { key: 'payment_reference', value: '', description: '0=Cash, 1=Cheque, 2=Balance' },
+                    { key: 'status', value: '', description: 'Transaction status' }
+                ];
+                break;
+            default:
+                params = [
+                    { key: 'name', value: '', description: 'Parameter name' },
+                    { key: 'value', value: '', description: 'Parameter value' }
+                ];
+        }
+        
+        params.forEach(param => {
+            addParameterRow(param.key, param.value, false);
+        });
+    }
+    
+    // Check if there are existing parameter rows
+    function hasExistingParams() {
+        const tableBody = document.getElementById('params-table-body');
+        return tableBody && tableBody.children.length > 0;
     }
 }
 
@@ -257,63 +412,59 @@ async function loadDashboard() {
 // Data Loading Functions
 async function loadChainActors() {
     try {
-        showLoading(true);
+        showTableLoading('actors-tbody');
         const response = await fetchData('/chain-actors');
         currentData = response.data || [];
         renderChainActorsTable(currentData);
     } catch (error) {
         console.error('Error loading chain actors:', error);
         showToast('Error loading chain actors', 'error');
-    } finally {
-        showLoading(false);
+        showTableError('actors-tbody', 'Error loading chain actors');
     }
 }
 
 async function loadProductionSeasons() {
     try {
-        showLoading(true);
+        showTableLoading('seasons-tbody');
         const response = await fetchData('/production-seasons');
         currentData = response.data || [];
         renderProductionSeasonsTable(currentData);
     } catch (error) {
         console.error('Error loading production seasons:', error);
         showToast('Error loading production seasons', 'error');
-    } finally {
-        showLoading(false);
+        showTableError('seasons-tbody', 'Error loading production seasons');
     }
 }
 
 async function loadRiceBatches() {
     try {
-        showLoading(true);
+        showTableLoading('batches-tbody');
         const response = await fetchData('/rice-batches');
         currentData = response.data || [];
         renderRiceBatchesTable(currentData);
     } catch (error) {
         console.error('Error loading rice batches:', error);
         showToast('Error loading rice batches', 'error');
-    } finally {
-        showLoading(false);
+        showTableError('batches-tbody', 'Error loading rice batches');
     }
 }
 
 async function loadMilledRice() {
     try {
-        showLoading(true);
+        showTableLoading('milled-tbody');
         const response = await fetchData('/milled-rice');
         currentData = response.data || [];
         renderMilledRiceTable(currentData);
     } catch (error) {
         console.error('Error loading milled rice:', error);
         showToast('Error loading milled rice', 'error');
-    } finally {
-        showLoading(false);
+        showTableError('milled-tbody', 'Error loading milled rice');
     }
 }
 
 async function loadChainTransactions() {
     try {
-        showLoading(true);
+        showTableLoading('transactions-tbody');
         const response = await fetchData('/transactions');
         currentData = response.data || [];
         
@@ -337,20 +488,30 @@ async function loadChainTransactions() {
     } catch (error) {
         console.error('Error loading chain transactions:', error);
         showToast('Error loading chain transactions', 'error');
-    } finally {
-        showLoading(false);
+        showTableError('transactions-tbody', 'Error loading chain transactions');
     }
 }
 
 
 async function loadRecentTransactions() {
+    const container = document.getElementById('recent-transactions');
     try {
+        // Show loading spinner
+        container.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center py-3">
+                <div class="spinner-border text-success me-2" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="text-muted">Loading recent transactions...</span>
+            </div>
+        `;
+        
         const response = await fetchData('/transactions');
         const transactions = response.data || [];
         renderRecentTransactions(transactions.slice(0, 5)); // Show only 5 most recent
     } catch (error) {
         console.error('Error loading recent transactions:', error);
-        document.getElementById('recent-transactions').innerHTML = 
+        container.innerHTML = 
             '<div class="text-center text-muted"><i class="fas fa-exclamation-triangle"></i> Unable to load recent transactions</div>';
     }
 }
@@ -1272,7 +1433,93 @@ function initializeApiTester() {
     const urlInput = document.getElementById('api-url');
     const sendButton = document.getElementById('send-request');
     const clearButton = document.getElementById('clear-response');
-    const requestBodySection = document.getElementById('request-body-section');
+    const bodySection = document.getElementById('request-body-section');
+
+    // Pre-filled data templates
+    const endpointTemplates = {
+        '/api/chain-actors': {
+            headers: [
+                { name: 'Content-Type', value: 'application/json' },
+                { name: 'Accept', value: 'application/json' }
+            ],
+            body: [
+                { name: 'name', value: '' },
+                { name: 'type', value: 'farmer' },
+                { name: 'contact_info', value: '' },
+                { name: 'location', value: '' },
+                { name: 'group_name', value: '' },
+                { name: 'farmer_id', value: '' }
+            ]
+        },
+        '/api/production-seasons': {
+            headers: [
+                { name: 'Content-Type', value: 'application/json' },
+                { name: 'Accept', value: 'application/json' }
+            ],
+            body: [
+                { name: 'season_name', value: '' },
+                { name: 'planting_date', value: '' },
+                { name: 'harvesting_date', value: '' },
+                { name: 'variety', value: '' },
+                { name: 'carbon_certified', value: 'false' },
+                { name: 'farmer_id', value: '' }
+            ]
+        },
+        '/api/rice-batches': {
+            headers: [
+                { name: 'Content-Type', value: 'application/json' },
+                { name: 'Accept', value: 'application/json' }
+            ],
+            body: [
+                { name: 'batch_number', value: '' },
+                { name: 'farmer_name', value: '' },
+                { name: 'rice_variety', value: '' },
+                { name: 'planting_date', value: '' },
+                { name: 'harvest_date', value: '' },
+                { name: 'quantity_harvested', value: '' },
+                { name: 'quality_grade', value: '' },
+                { name: 'storage_conditions', value: '' },
+                { name: 'certifications', value: '' }
+            ]
+        },
+        '/api/milled-rice': {
+            headers: [
+                { name: 'Content-Type', value: 'application/json' },
+                { name: 'Accept', value: 'application/json' }
+            ],
+            body: [
+                { name: 'batch_id', value: '' },
+                { name: 'miller_name', value: '' },
+                { name: 'milling_date', value: '' },
+                { name: 'input_quantity', value: '' },
+                { name: 'output_quantity', value: '' },
+                { name: 'yield_percentage', value: '' }
+            ]
+        },
+        '/api/transactions': {
+            headers: [
+                { name: 'Content-Type', value: 'application/json' },
+                { name: 'Accept', value: 'application/json' }
+            ],
+            body: [
+                { name: 'batch_id', value: '' },
+                { name: 'from_actor', value: '' },
+                { name: 'to_actor', value: '' },
+                { name: 'quantity', value: '' },
+                { name: 'total_amount', value: '' },
+                { name: 'payment_reference', value: '' },
+                { name: 'moisture_content', value: '' }
+            ]
+        },
+    };
+
+    // Initialize tables
+    initializeHeadersTable();
+    initializeBodyTable();
+    
+    // Add event listeners for add buttons
+    document.getElementById('add-header-btn').addEventListener('click', () => addHeaderRow());
+    document.getElementById('generate-sample-btn').addEventListener('click', () => generateSampleData());
 
     // Update URL when method or endpoint changes
     function updateUrl() {
@@ -1280,24 +1527,360 @@ function initializeApiTester() {
         const endpoint = endpointSelect.value;
         urlInput.value = baseUrl + endpoint;
         
-        // Show/hide request body section based on method
+        // Show/hide body section based on method
         const method = methodSelect.value;
         if (method === 'POST' || method === 'PUT') {
-            requestBodySection.style.display = 'block';
+            bodySection.style.display = 'block';
         } else {
-            requestBodySection.style.display = 'none';
+            bodySection.style.display = 'none';
+        }
+        
+        // Load pre-filled data for the selected endpoint
+        loadEndpointTemplate(endpoint);
+    }
+
+    function loadEndpointTemplate(endpoint) {
+        const template = endpointTemplates[endpoint];
+        if (template) {
+            // Clear existing data
+            clearHeadersTable();
+            clearBodyTable();
+            
+            // Load headers
+            template.headers.forEach(header => {
+                addHeaderRow(header.name, header.value);
+            });
+            
+            // Load body parameters
+            template.body.forEach(param => {
+                addBodyRow(param.name, param.value);
+            });
         }
     }
 
     methodSelect.addEventListener('change', updateUrl);
     endpointSelect.addEventListener('change', updateUrl);
 
+    // Helper functions for table management
+    function initializeHeadersTable() {
+        // Clear any existing rows first
+        clearHeadersTable();
+        // Add default Content-Type header
+        addHeaderRow('Content-Type', 'application/json');
+    }
+
+    function initializeBodyTable() {
+        // Body table starts empty
+    }
+
+    function addHeaderRow(name = '', value = '') {
+        const tbody = document.getElementById('headers-table-body');
+        const row = document.createElement('tr');
+        row.className = 'header-row';
+        row.innerHTML = `
+            <td>
+                <input type="text" class="form-control header-name" value="${name}" placeholder="Header name">
+            </td>
+            <td>
+                <input type="text" class="form-control header-value" value="${value}" placeholder="Header value">
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-header-btn">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        
+        // Add remove functionality
+        row.querySelector('.remove-header-btn').addEventListener('click', () => {
+            row.remove();
+        });
+        
+        tbody.appendChild(row);
+    }
+
+    function addBodyRow(name = '', value = '') {
+        const tbody = document.getElementById('params-table-body');
+        const row = document.createElement('tr');
+        row.className = 'param-row';
+        row.innerHTML = `
+            <td>
+                <input type="text" class="form-control param-key" value="${name}" placeholder="Parameter name" readonly>
+            </td>
+            <td>
+                <input type="text" class="form-control param-value" value="${value}" placeholder="Parameter value">
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    }
+
+    function clearHeadersTable() {
+        document.getElementById('headers-table-body').innerHTML = '';
+    }
+
+    function clearBodyTable() {
+        document.getElementById('params-table-body').innerHTML = '';
+    }
+
+    function getHeadersFromTable() {
+        const headers = {};
+        const headerRows = document.querySelectorAll('.header-row');
+        
+        headerRows.forEach(row => {
+            const nameInput = row.querySelector('.header-name');
+            const valueInput = row.querySelector('.header-value');
+            
+            if (nameInput && valueInput && nameInput.value.trim() && valueInput.value.trim()) {
+                headers[nameInput.value.trim()] = valueInput.value.trim();
+            }
+        });
+        
+        return headers;
+    }
+
+    function getBodyFromTable() {
+        const requestData = {};
+        const paramRows = document.querySelectorAll('.param-row');
+        
+        paramRows.forEach(row => {
+            const keyInput = row.querySelector('.param-key');
+            const valueInput = row.querySelector('.param-value');
+            
+            if (keyInput && valueInput && keyInput.value.trim() && valueInput.value.trim()) {
+                let value = valueInput.value.trim();
+                
+                // Try to parse as number if it looks like a number
+                if (!isNaN(value) && !isNaN(parseFloat(value))) {
+                    value = parseFloat(value);
+                }
+                
+                // Try to parse as boolean
+                if (value === 'true') value = true;
+                if (value === 'false') value = false;
+                
+                requestData[keyInput.value.trim()] = value;
+            }
+        });
+        
+        // Add transaction date automatically for transactions
+        if (endpointSelect && endpointSelect.value === '/api/transactions') {
+            requestData.transaction_date = new Date().toISOString();
+        }
+        
+        return requestData;
+    }
+
+    function generateSampleData() {
+        const endpoint = endpointSelect.value;
+        const paramRows = document.querySelectorAll('.param-row');
+        
+        try {
+            paramRows.forEach(row => {
+                const keyInput = row.querySelector('.param-key');
+                const valueInput = row.querySelector('.param-value');
+                
+                if (keyInput && valueInput) {
+                    const paramName = keyInput.value.trim().toLowerCase();
+                    let sampleValue = '';
+                    
+                    // Generate sample data - use Faker if available, otherwise use fallback
+                    if (typeof faker !== 'undefined') {
+                    // Generate sample data using Faker.js (v3.1.0 API)
+                    switch (paramName) {
+                                case 'name':
+                                case 'farmer_name':
+                                case 'miller_name':
+                                    sampleValue = faker.name.findName();
+                                    break;
+                                case 'type':
+                                    sampleValue = faker.random.arrayElement(['farmer', 'miller', 'distributor', 'retailer']);
+                                    break;
+                                case 'contact_info':
+                                    sampleValue = faker.phone.phoneNumber();
+                                    break;
+                                case 'location':
+                                case 'farmer_location':
+                                    sampleValue = `${faker.address.city()}, ${faker.address.state()}`;
+                                    break;
+                                case 'group_name':
+                                    sampleValue = `${faker.company.companyName()} Cooperative`;
+                                    break;
+                                case 'farmer_id':
+                                case 'batch_id':
+                                    sampleValue = faker.random.number({ min: 1, max: 100 }).toString();
+                                    break;
+                                case 'season_name':
+                                    sampleValue = `${faker.random.arrayElement(['Spring', 'Summer', 'Fall', 'Winter'])} ${new Date().getFullYear()}`;
+                                    break;
+                                case 'planting_date':
+                                case 'harvest_date':
+                                case 'harvesting_date':
+                                case 'milling_date':
+                                    sampleValue = faker.date.past().toISOString().split('T')[0];
+                                    break;
+                                case 'variety':
+                                case 'rice_variety':
+                                    sampleValue = faker.random.arrayElement(['Jasmine', 'Basmati', 'Arborio', 'Brown Rice', 'Wild Rice']);
+                                    break;
+                                case 'carbon_certified':
+                                    sampleValue = faker.random.boolean().toString();
+                                    break;
+                                case 'batch_number':
+                                    sampleValue = `BATCH-${faker.random.alphaNumeric(8).toUpperCase()}`;
+                                    break;
+                                case 'quantity_harvested':
+                                case 'input_quantity':
+                                case 'output_quantity':
+                                case 'quantity':
+                                    sampleValue = faker.random.number({ min: 50, max: 1000 }).toString();
+                                    break;
+                                case 'quality_grade':
+                                    sampleValue = faker.random.arrayElement(['A', 'B', 'C', 'Premium', 'Standard']);
+                                    break;
+                                case 'storage_conditions':
+                                    sampleValue = faker.random.arrayElement(['Cool & Dry', 'Temperature Controlled', 'Warehouse Storage']);
+                                    break;
+                                case 'certifications':
+                                    sampleValue = faker.random.arrayElement(['Organic', 'Fair Trade', 'Non-GMO', 'Sustainable']);
+                                    break;
+                                case 'yield_percentage':
+                                    sampleValue = (faker.random.number({ min: 600, max: 950 }) / 10).toString();
+                                    break;
+                                case 'from_actor':
+                                case 'to_actor':
+                                    sampleValue = faker.name.findName();
+                                    break;
+                                case 'total_amount':
+                                    sampleValue = faker.random.number({ min: 1000, max: 50000 }).toString();
+                                    break;
+                                case 'payment_reference':
+                                    sampleValue = `PAY-${faker.random.alphaNumeric(10).toUpperCase()}`;
+                                    break;
+                                case 'moisture_content':
+                                    sampleValue = (faker.random.number({ min: 100, max: 200 }) / 10).toString();
+                                    break;
+                                default:
+                                    // Generic fallback based on data type patterns
+                                    if (paramName.includes('date')) {
+                                        sampleValue = faker.date.past().toISOString().split('T')[0];
+                                    } else if (paramName.includes('amount') || paramName.includes('price')) {
+                                        sampleValue = faker.random.number({ min: 100, max: 10000 }).toString();
+                                    } else if (paramName.includes('id')) {
+                                        sampleValue = faker.random.number({ min: 1, max: 100 }).toString();
+                                    } else {
+                                        sampleValue = faker.lorem.words(2);
+                                    }
+                                    break;
+                            }
+                        } else {
+                            // Fallback basic sample data generation without Faker
+                            switch (paramName) {
+                                case 'name':
+                                case 'farmer_name':
+                                case 'miller_name':
+                                    sampleValue = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson'][Math.floor(Math.random() * 4)];
+                                    break;
+                                case 'type':
+                                    sampleValue = ['farmer', 'miller', 'distributor', 'retailer'][Math.floor(Math.random() * 4)];
+                                    break;
+                                case 'contact_info':
+                                    sampleValue = `+1-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`;
+                                    break;
+                                case 'location':
+                                case 'farmer_location':
+                                    sampleValue = ['Manila, Philippines', 'Cebu, Philippines', 'Davao, Philippines'][Math.floor(Math.random() * 3)];
+                                    break;
+                                case 'group_name':
+                                    sampleValue = ['Rice Farmers Cooperative', 'Agricultural Alliance', 'Harvest Group'][Math.floor(Math.random() * 3)];
+                                    break;
+                                case 'farmer_id':
+                                case 'batch_id':
+                                    sampleValue = (Math.floor(Math.random() * 100) + 1).toString();
+                                    break;
+                                case 'season_name':
+                                    sampleValue = `${['Spring', 'Summer', 'Fall', 'Winter'][Math.floor(Math.random() * 4)]} ${new Date().getFullYear()}`;
+                                    break;
+                                case 'planting_date':
+                                case 'harvest_date':
+                                case 'harvesting_date':
+                                case 'milling_date':
+                                    const pastDate = new Date();
+                                    pastDate.setDate(pastDate.getDate() - Math.floor(Math.random() * 365));
+                                    sampleValue = pastDate.toISOString().split('T')[0];
+                                    break;
+                                case 'variety':
+                                case 'rice_variety':
+                                    sampleValue = ['Jasmine', 'Basmati', 'Arborio', 'Brown Rice', 'Wild Rice'][Math.floor(Math.random() * 5)];
+                                    break;
+                                case 'carbon_certified':
+                                    sampleValue = Math.random() > 0.5 ? 'true' : 'false';
+                                    break;
+                                case 'batch_number':
+                                    sampleValue = `BATCH-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
+                                    break;
+                                case 'quantity_harvested':
+                                case 'input_quantity':
+                                case 'output_quantity':
+                                case 'quantity':
+                                    sampleValue = (Math.floor(Math.random() * 950) + 50).toString();
+                                    break;
+                                case 'quality_grade':
+                                    sampleValue = ['A', 'B', 'C', 'Premium', 'Standard'][Math.floor(Math.random() * 5)];
+                                    break;
+                                case 'storage_conditions':
+                                    sampleValue = ['Cool & Dry', 'Temperature Controlled', 'Warehouse Storage'][Math.floor(Math.random() * 3)];
+                                    break;
+                                case 'certifications':
+                                    sampleValue = ['Organic', 'Fair Trade', 'Non-GMO', 'Sustainable'][Math.floor(Math.random() * 4)];
+                                    break;
+                                case 'yield_percentage':
+                                    sampleValue = (Math.random() * 35 + 60).toFixed(1);
+                                    break;
+                                case 'from_actor':
+                                case 'to_actor':
+                                    sampleValue = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson'][Math.floor(Math.random() * 4)];
+                                    break;
+                                case 'total_amount':
+                                    sampleValue = (Math.floor(Math.random() * 49000) + 1000).toString();
+                                    break;
+                                case 'payment_reference':
+                                    sampleValue = `PAY-${Math.random().toString(36).substr(2, 10).toUpperCase()}`;
+                                    break;
+                                case 'moisture_content':
+                                    sampleValue = (Math.random() * 10 + 10).toFixed(1);
+                                    break;
+                                default:
+                                    // Generic fallback
+                                    if (paramName.includes('date')) {
+                                        const pastDate = new Date();
+                                        pastDate.setDate(pastDate.getDate() - Math.floor(Math.random() * 365));
+                                        sampleValue = pastDate.toISOString().split('T')[0];
+                                    } else if (paramName.includes('amount') || paramName.includes('price')) {
+                                        sampleValue = (Math.floor(Math.random() * 9900) + 100).toString();
+                                    } else if (paramName.includes('id')) {
+                                        sampleValue = (Math.floor(Math.random() * 100) + 1).toString();
+                                    } else {
+                                        sampleValue = 'Sample Data';
+                                    }
+                                    break;
+                            }
+                        }
+                        
+                        valueInput.value = sampleValue;
+                    }
+                });
+                
+            showToast('Sample data generated successfully!', 'success');
+        } catch (error) {
+            showToast('Error generating sample data: ' + error.message, 'error');
+        }
+    }
+
     // Send API request
     sendButton.addEventListener('click', async function() {
         const method = methodSelect.value;
         const url = urlInput.value;
-        const headersText = document.getElementById('api-headers').value;
-        const bodyText = document.getElementById('api-body').value;
         const responseElement = document.getElementById('api-response');
         const statusElement = document.getElementById('response-status');
 
@@ -1305,11 +1888,8 @@ function initializeApiTester() {
             statusElement.textContent = 'Loading...';
             statusElement.className = 'badge bg-warning';
 
-            // Parse headers
-            let headers = {};
-            if (headersText.trim()) {
-                headers = JSON.parse(headersText);
-            }
+            // Get headers from table
+            const headers = getHeadersFromTable();
 
             // Prepare request options
             const options = {
@@ -1318,8 +1898,11 @@ function initializeApiTester() {
             };
 
             // Add body for POST/PUT requests
-            if ((method === 'POST' || method === 'PUT') && bodyText.trim()) {
-                options.body = bodyText;
+            if (method === 'POST' || method === 'PUT') {
+                const requestData = getBodyFromTable();
+                if (Object.keys(requestData).length > 0) {
+                    options.body = JSON.stringify(requestData);
+                }
             }
 
             const startTime = Date.now();
@@ -1749,6 +2332,41 @@ function showLoading(show) {
     const spinner = document.getElementById('loadingSpinner');
     if (spinner) {
         spinner.classList.toggle('d-none', !show);
+    }
+}
+
+// Show table loading state
+function showTableLoading(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    if (tbody) {
+        const colCount = tbody.closest('table').querySelector('thead tr').children.length;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="${colCount}" class="text-center py-4">
+                    <div class="d-flex justify-content-center align-items-center">
+                        <div class="spinner-border text-success me-2" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span class="text-muted">Loading data...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+// Show table error state
+function showTableError(tbodyId, message) {
+    const tbody = document.getElementById(tbodyId);
+    if (tbody) {
+        const colCount = tbody.closest('table').querySelector('thead tr').children.length;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="${colCount}" class="text-center py-4 text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>${message}
+                </td>
+            </tr>
+        `;
     }
 }
 

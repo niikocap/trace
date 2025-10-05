@@ -253,12 +253,17 @@ class SolanaService {
             const jsonString = data.subarray(offset, offset + jsonLength).toString('utf8');
             offset += jsonLength;
             
+            // Validate JSON string before parsing
+            if (!jsonString || jsonString.trim() === '' || jsonLength === 0) {
+                return null;
+            }
+            
             // Parse JSON data
             let transactionData;
             try {
                 transactionData = JSON.parse(jsonString);
             } catch (parseError) {
-                console.error('Failed to parse JSON from blockchain:', parseError);
+                // Silently skip invalid JSON data instead of logging errors
                 return null;
             }
             

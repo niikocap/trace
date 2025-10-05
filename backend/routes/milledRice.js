@@ -236,8 +236,13 @@ router.put('/:id', async (req, res) => {
         } = req.body;
         
         // Check if record exists
-        const existingRecord = await database.get('SELECT * FROM milled_rice WHERE id = ?', [id]);
-        if (!existingRecord) {
+        const { data: existingRecord, error: checkError } = await database.supabase
+            .from('milled_rice')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (checkError || !existingRecord) {
             return res.status(404).json({
                 success: false,
                 error: 'Milled rice record not found'
@@ -372,8 +377,13 @@ router.delete('/:id', async (req, res) => {
         const { id } = req.params;
         
         // Check if record exists
-        const existingRecord = await database.get('SELECT * FROM milled_rice WHERE id = ?', [id]);
-        if (!existingRecord) {
+        const { data: existingRecord, error: checkError } = await database.supabase
+            .from('milled_rice')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (checkError || !existingRecord) {
             return res.status(404).json({
                 success: false,
                 error: 'Milled rice record not found'
@@ -409,19 +419,31 @@ router.get('/batch/:batchId', async (req, res) => {
     try {
         const { batchId } = req.params;
         
-        const milledRice = await database.all(`
-            SELECT mr.*, ca.name as miller_name, rb.batch_number
-            FROM milled_rice mr
-            LEFT JOIN chain_actors ca ON mr.miller_id = ca.id
-            LEFT JOIN rice_batches rb ON mr.batch_id = rb.id
-            WHERE mr.batch_id = ?
-            ORDER BY mr.milling_date DESC
-        `, [batchId]);
+        const { data: milledRice, error } = await database.supabase
+            .from('milled_rice')
+            .select(`
+                *,
+                miller:chain_actors!miller_id(name),
+                rice_batch:rice_batches!batch_id(batch_number)
+            `)
+            .eq('batch_id', batchId)
+            .order('milling_date', { ascending: false });
+            
+        if (error) {
+            throw error;
+        }
+        
+        // Transform the data to match expected format
+        const transformedData = milledRice?.map(rice => ({
+            ...rice,
+            miller_name: rice.miller?.name || null,
+            batch_number: rice.rice_batch?.batch_number || null
+        })) || [];
         
         res.json({
             success: true,
-            data: milledRice,
-            count: milledRice.length
+            data: transformedData,
+            count: transformedData.length
         });
     } catch (error) {
         console.error('Error fetching milled rice by batch:', error);

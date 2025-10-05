@@ -36,9 +36,13 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const actor = await database.get('chain_actors', { id });
+        const { data: actor, error } = await database.supabase
+            .from('chain_actors')
+            .select('*')
+            .eq('id', id)
+            .single();
         
-        if (!actor) {
+        if (error || !actor) {
             return res.status(404).json({
                 success: false,
                 error: 'Chain actor not found'
@@ -95,16 +99,22 @@ router.post('/', async (req, res) => {
             }
         }
         
-        const result = await database.insert('chain_actors', {
-            name,
-            type: typeToStore,
-            location: location || null,
-            group: group || null,
-            farmer_id: farmer_id || null,
-            assign_tps: assign_tps || null
-        });
-        
-        const newActor = await database.get('chain_actors', { id: result.id });
+        const { data: newActor, error: insertError } = await database.supabase
+            .from('chain_actors')
+            .insert({
+                name,
+                type: typeToStore,
+                location: location || null,
+                group: group || null,
+                farmer_id: farmer_id || null,
+                assign_tps: assign_tps || null
+            })
+            .select()
+            .single();
+            
+        if (insertError) {
+            throw insertError;
+        }
         
         res.status(201).json({
             success: true,
@@ -129,8 +139,13 @@ router.put('/:id', async (req, res) => {
         const { name, type, contact_info, location, certification_details } = req.body;
         
         // Check if actor exists
-        const existingActor = await database.get('SELECT * FROM chain_actors WHERE id = ?', [id]);
-        if (!existingActor) {
+        const { data: existingActor, error: checkError } = await database.supabase
+            .from('chain_actors')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (checkError || !existingActor) {
             return res.status(404).json({
                 success: false,
                 error: 'Chain actor not found'
@@ -169,9 +184,24 @@ router.put('/:id', async (req, res) => {
         if (farmer_id !== undefined) updateData.farmer_id = farmer_id;
         if (assign_tps !== undefined) updateData.assign_tps = assign_tps;
         
-        await database.update('chain_actors', id, updateData);
+        const { error: updateError } = await database.supabase
+            .from('chain_actors')
+            .update(updateData)
+            .eq('id', id);
+            
+        if (updateError) {
+            throw updateError;
+        }
         
-        const updatedActor = await database.get('chain_actors', { id });
+        const { data: updatedActor, error: fetchError } = await database.supabase
+            .from('chain_actors')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (fetchError) {
+            throw fetchError;
+        }
         
         res.json({
             success: true,
@@ -195,8 +225,13 @@ router.delete('/:id', async (req, res) => {
         const { id } = req.params;
         
         // Check if actor exists
-        const existingActor = await database.get('chain_actors', { id });
-        if (!existingActor) {
+        const { data: existingActor, error: checkError } = await database.supabase
+            .from('chain_actors')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (checkError || !existingActor) {
             return res.status(404).json({
                 success: false,
                 error: 'Chain actor not found'
@@ -204,17 +239,35 @@ router.delete('/:id', async (req, res) => {
         }
         
         // Check for dependencies
-        const riceBatches = await database.all('rice_batches', { farmer_id: id });
-        const milledRice = await database.all('milled_rice', { miller_id: id });
+        const { data: riceBatches, error: batchError } = await database.supabase
+            .from('rice_batches')
+            .select('id')
+            .eq('farmer_id', id);
+            
+        const { data: milledRice, error: milledError } = await database.supabase
+            .from('milled_rice')
+            .select('id')
+            .eq('miller_id', id);
+            
+        if (batchError || milledError) {
+            throw batchError || milledError;
+        }
         
-        if (riceBatches.length > 0 || milledRice.length > 0) {
+        if ((riceBatches && riceBatches.length > 0) || (milledRice && milledRice.length > 0)) {
             return res.status(400).json({
                 success: false,
                 error: 'Cannot delete chain actor with existing dependencies (rice batches or milled rice records)'
             });
         }
         
-        await database.delete('chain_actors', id);
+        const { error: deleteError } = await database.supabase
+            .from('chain_actors')
+            .delete()
+            .eq('id', id);
+            
+        if (deleteError) {
+            throw deleteError;
+        }
         
         res.json({
             success: true,
@@ -244,7 +297,15 @@ router.get('/type/:type', async (req, res) => {
             });
         }
         
-        const actors = await database.all('chain_actors', { type }, { column: 'created_at', ascending: false });
+        const { data: actors, error } = await database.supabase
+            .from('chain_actors')
+            .select('*')
+            .eq('type', type)
+            .order('created_at', { ascending: false });
+            
+        if (error) {
+            throw error;
+        }
         
         res.json({
             success: true,

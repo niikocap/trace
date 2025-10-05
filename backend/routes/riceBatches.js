@@ -278,8 +278,13 @@ router.put('/:id', async (req, res) => {
         } = req.body;
         
         // Check if record exists
-        const existingBatch = await database.get('SELECT * FROM rice_batches WHERE id = ?', [id]);
-        if (!existingBatch) {
+        const { data: existingBatch, error: checkError } = await database.supabase
+            .from('rice_batches')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (checkError || !existingBatch) {
             return res.status(404).json({
                 success: false,
                 error: 'Rice batch not found'
@@ -288,7 +293,13 @@ router.put('/:id', async (req, res) => {
         
         // Check for unique batch number if provided
         if (batch_number && batch_number !== existingBatch.batch_number) {
-            const duplicateBatch = await database.get('SELECT * FROM rice_batches WHERE batch_number = ? AND id != ?', [batch_number, id]);
+            const { data: duplicateBatch } = await database.supabase
+                .from('rice_batches')
+                .select('id')
+                .eq('batch_number', batch_number)
+                .neq('id', id)
+                .single();
+                
             if (duplicateBatch) {
                 return res.status(400).json({
                     success: false,
@@ -299,7 +310,13 @@ router.put('/:id', async (req, res) => {
         
         // Validate foreign key constraints if provided
         if (farmer_id) {
-            const farmer = await database.get('SELECT * FROM chain_actors WHERE id = ? AND type = "farmer"', [farmer_id]);
+            const { data: farmer } = await database.supabase
+                .from('chain_actors')
+                .select('id')
+                .eq('id', farmer_id)
+                .eq('type', 'farmer')
+                .single();
+                
             if (!farmer) {
                 return res.status(400).json({
                     success: false,
@@ -309,7 +326,12 @@ router.put('/:id', async (req, res) => {
         }
         
         if (production_season_id) {
-            const season = await database.get('SELECT * FROM production_seasons WHERE id = ?', [production_season_id]);
+            const { data: season } = await database.supabase
+                .from('production_seasons')
+                .select('id')
+                .eq('id', production_season_id)
+                .single();
+                
             if (!season) {
                 return res.status(400).json({
                     success: false,
@@ -424,8 +446,13 @@ router.delete('/:id', async (req, res) => {
         const { id } = req.params;
         
         // Check if record exists
-        const existingBatch = await database.get('SELECT * FROM rice_batches WHERE id = ?', [id]);
-        if (!existingBatch) {
+        const { data: existingBatch, error: checkError } = await database.supabase
+            .from('rice_batches')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (checkError || !existingBatch) {
             return res.status(404).json({
                 success: false,
                 error: 'Rice batch not found'
@@ -433,8 +460,16 @@ router.delete('/:id', async (req, res) => {
         }
         
         // Check for dependencies
-        const milledRice = await database.get('SELECT COUNT(*) as count FROM milled_rice WHERE batch_id = ?', [id]);
-        if (milledRice.count > 0) {
+        const { data: milledRice, error: milledError } = await database.supabase
+            .from('milled_rice')
+            .select('id')
+            .eq('batch_id', id);
+            
+        if (milledError) {
+            throw milledError;
+        }
+        
+        if (milledRice && milledRice.length > 0) {
             return res.status(400).json({
                 success: false,
                 error: 'Cannot delete rice batch with existing milled rice records'
@@ -470,19 +505,31 @@ router.get('/farmer/:farmerId', async (req, res) => {
     try {
         const { farmerId } = req.params;
         
-        const riceBatches = await database.all(`
-            SELECT rb.*, ca.name as farmer_name, ps.season_name
-            FROM rice_batches rb
-            LEFT JOIN chain_actors ca ON rb.farmer_id = ca.id
-            LEFT JOIN production_seasons ps ON rb.production_season_id = ps.id
-            WHERE rb.farmer_id = ?
-            ORDER BY rb.harvest_date DESC
-        `, [farmerId]);
+        const { data: riceBatches, error } = await database.supabase
+            .from('rice_batches')
+            .select(`
+                *,
+                farmer:chain_actors!farmer_id(name),
+                production_season:production_seasons!production_season_id(season_name)
+            `)
+            .eq('farmer_id', farmerId)
+            .order('harvest_date', { ascending: false });
+            
+        if (error) {
+            throw error;
+        }
+        
+        // Transform the data to match expected format
+        const transformedData = riceBatches?.map(batch => ({
+            ...batch,
+            farmer_name: batch.farmer?.name || null,
+            season_name: batch.production_season?.season_name || null
+        })) || [];
         
         res.json({
             success: true,
-            data: riceBatches,
-            count: riceBatches.length
+            data: transformedData,
+            count: transformedData.length
         });
     } catch (error) {
         console.error('Error fetching rice batches by farmer:', error);
@@ -499,19 +546,31 @@ router.get('/season/:seasonId', async (req, res) => {
     try {
         const { seasonId } = req.params;
         
-        const riceBatches = await database.all(`
-            SELECT rb.*, ca.name as farmer_name, ps.season_name
-            FROM rice_batches rb
-            LEFT JOIN chain_actors ca ON rb.farmer_id = ca.id
-            LEFT JOIN production_seasons ps ON rb.production_season_id = ps.id
-            WHERE rb.production_season_id = ?
-            ORDER BY rb.harvest_date DESC
-        `, [seasonId]);
+        const { data: riceBatches, error } = await database.supabase
+            .from('rice_batches')
+            .select(`
+                *,
+                farmer:chain_actors!farmer_id(name),
+                production_season:production_seasons!production_season_id(season_name)
+            `)
+            .eq('production_season_id', seasonId)
+            .order('harvest_date', { ascending: false });
+            
+        if (error) {
+            throw error;
+        }
+        
+        // Transform the data to match expected format
+        const transformedData = riceBatches?.map(batch => ({
+            ...batch,
+            farmer_name: batch.farmer?.name || null,
+            season_name: batch.production_season?.season_name || null
+        })) || [];
         
         res.json({
             success: true,
-            data: riceBatches,
-            count: riceBatches.length
+            data: transformedData,
+            count: transformedData.length
         });
     } catch (error) {
         console.error('Error fetching rice batches by season:', error);

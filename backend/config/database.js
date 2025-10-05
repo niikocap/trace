@@ -1,100 +1,88 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
 class Database {
     constructor() {
-        this.db = null;
+        this.supabase = null;
     }
 
     connect() {
-        return new Promise((resolve, reject) => {
-            const dbPath = path.join(__dirname, '../database/rice_supply_chain.db');
-            this.db = new sqlite3.Database(dbPath, (err) => {
-                if (err) {
-                    console.error('Error connecting to SQLite database:', err.message);
-                    reject(err);
-                } else {
-                    console.log('Connected to SQLite database');
-                    resolve(this.db);
-                }
-            });
-        });
+        try {
+            const supabaseUrl = process.env.SUPABASE_URL;
+            const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+            if (!supabaseUrl || !supabaseKey) {
+                throw new Error('Missing Supabase configuration. Please check SUPABASE_URL and SUPABASE_ANON_KEY in your .env file');
+            }
+
+            this.supabase = createClient(supabaseUrl, supabaseKey);
+            console.log('Connected to Supabase database');
+            return Promise.resolve(this.supabase);
+        } catch (error) {
+            console.error('Error connecting to Supabase database:', error.message);
+            return Promise.reject(error);
+        }
     }
 
     close() {
-        return new Promise((resolve, reject) => {
-            if (this.db) {
-                this.db.close((err) => {
-                    if (err) {
-                        console.error('Error closing database:', err.message);
-                        reject(err);
-                    } else {
-                        console.log('Database connection closed');
-                        resolve();
-                    }
-                });
-            } else {
-                resolve();
-            }
-        });
+        // Supabase doesn't require explicit closing
+        console.log('Supabase connection closed');
+        return Promise.resolve();
     }
 
-    run(sql, params = []) {
-        return new Promise((resolve, reject) => {
-            this.db.run(sql, params, function(err) {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve({ id: this.lastID, changes: this.changes });
-                }
-            });
-        });
-    }
-
-    get(sql, params = []) {
-        return new Promise((resolve, reject) => {
-            this.db.get(sql, params, (err, row) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(row);
-                }
-            });
-        });
-    }
-
-    all(sql, params = []) {
-        return new Promise((resolve, reject) => {
-            this.db.all(sql, params, (err, rows) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(rows);
-                }
-            });
-        });
-    }
-
+    // Helper methods for common operations
     async insert(tableName, data) {
-        const columns = Object.keys(data).join(', ');
-        const placeholders = Object.keys(data).map(() => '?').join(', ');
-        const values = Object.values(data);
+        const { data: result, error } = await this.supabase
+            .from(tableName)
+            .insert(data)
+            .select();
         
-        const sql = `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders})`;
-        return this.run(sql, values);
+        if (error) throw error;
+        return result;
     }
 
     async update(tableName, id, data) {
-        const setClause = Object.keys(data).map(key => `${key} = ?`).join(', ');
-        const values = [...Object.values(data), id];
+        const { data: result, error } = await this.supabase
+            .from(tableName)
+            .update(data)
+            .eq('id', id)
+            .select();
         
-        const sql = `UPDATE ${tableName} SET ${setClause} WHERE id = ?`;
-        return this.run(sql, values);
+        if (error) throw error;
+        return result;
     }
 
     async delete(tableName, id) {
-        const sql = `DELETE FROM ${tableName} WHERE id = ?`;
-        return this.run(sql, [id]);
+        const { data: result, error } = await this.supabase
+            .from(tableName)
+            .delete()
+            .eq('id', id);
+        
+        if (error) throw error;
+        return result;
+    }
+
+    async get(tableName, id) {
+        const { data, error } = await this.supabase
+            .from(tableName)
+            .select('*')
+            .eq('id', id)
+            .single();
+        
+        if (error) throw error;
+        return data;
+    }
+
+    async all(tableName, options = {}) {
+        let query = this.supabase.from(tableName).select('*');
+        
+        if (options.orderBy) {
+            query = query.order(options.orderBy.column, { ascending: options.orderBy.ascending });
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        return data;
     }
 }
 

@@ -156,8 +156,13 @@ router.put('/:id', async (req, res) => {
         } = req.body;
         
         // Check if season exists
-        const existingSeason = await database.get('SELECT * FROM production_seasons WHERE id = ?', [id]);
-        if (!existingSeason) {
+        const { data: existingSeason, error: checkError } = await database.supabase
+            .from('production_seasons')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (checkError || !existingSeason) {
             return res.status(404).json({
                 success: false,
                 error: 'Production season not found'
@@ -234,8 +239,13 @@ router.delete('/:id', async (req, res) => {
         const { id } = req.params;
         
         // Check if season exists
-        const existingSeason = await database.get('SELECT * FROM production_seasons WHERE id = ?', [id]);
-        if (!existingSeason) {
+        const { data: existingSeason, error: checkError } = await database.supabase
+            .from('production_seasons')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (checkError || !existingSeason) {
             return res.status(404).json({
                 success: false,
                 error: 'Production season not found'
@@ -243,12 +253,16 @@ router.delete('/:id', async (req, res) => {
         }
         
         // Check for dependencies
-        const riceBatches = await database.get(
-            'SELECT COUNT(*) as count FROM rice_batches WHERE production_season_id = ?',
-            [id]
-        );
+        const { data: riceBatches, error: batchError } = await database.supabase
+            .from('rice_batches')
+            .select('id')
+            .eq('production_season_id', id);
         
-        if (riceBatches.count > 0) {
+        if (batchError) {
+            throw batchError;
+        }
+        
+        if (riceBatches && riceBatches.length > 0) {
             return res.status(400).json({
                 success: false,
                 error: 'Cannot delete production season with existing rice batches'
@@ -284,13 +298,19 @@ router.get('/current/active', async (req, res) => {
     try {
         const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
         
-        const currentSeason = await database.get(
-            `SELECT * FROM production_seasons 
-             WHERE start_date <= ? AND end_date >= ?
-             ORDER BY start_date DESC
-             LIMIT 1`,
-            [currentDate, currentDate]
-        );
+        const { data: currentSeasons, error } = await database.supabase
+            .from('production_seasons')
+            .select('*')
+            .lte('start_date', currentDate)
+            .gte('end_date', currentDate)
+            .order('start_date', { ascending: false })
+            .limit(1);
+            
+        if (error) {
+            throw error;
+        }
+        
+        const currentSeason = currentSeasons && currentSeasons.length > 0 ? currentSeasons[0] : null;
         
         if (!currentSeason) {
             return res.status(404).json({
