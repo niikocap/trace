@@ -78,23 +78,28 @@ class SolanaService {
             // Generate new keypair for transaction account
             const transactionKeypair = Keypair.generate();
 
-            // Setup Anchor provider and program using IDL
-            const wallet = new anchor.Wallet(walletKeypair);
-            const provider = new AnchorProvider(this.connection, wallet, { commitment: SOLANA_CONFIG.commitment });
+            // Load IDL to obtain discriminator and build instruction data manually
             const idlPath = path.join(__dirname, '../../solana-program/target/idl/rice_supply_chain.json');
             const idl = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
-            const program = new Program(idl, this.programId, provider);
+            const createIx = (idl.instructions || []).find(ix => ix.name === 'create_transaction');
+            if (!createIx || !Array.isArray(createIx.discriminator)) {
+                throw new Error('IDL missing create_transaction discriminator');
+            }
 
-            // Build main instruction via Anchor (passing JSON string)
+            // Build main instruction data: discriminator (8 bytes) + borsh string(json)
             const jsonData = JSON.stringify(transactionData);
-            const instruction = await program.methods
-                .createTransaction(jsonData)
-                .accounts({
-                    transaction: transactionKeypair.publicKey,
-                    authority: wallet.publicKey,
-                    systemProgram: SystemProgram.programId,
-                })
-                .instruction();
+            const discriminator = Buffer.from(createIx.discriminator);
+            const data = Buffer.concat([discriminator, this.serializeString(jsonData)]);
+
+            const instruction = new TransactionInstruction({
+                programId: this.programId,
+                keys: [
+                    { pubkey: transactionKeypair.publicKey, isSigner: true, isWritable: true },
+                    { pubkey: walletKeypair.publicKey, isSigner: true, isWritable: true },
+                    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+                ],
+                data,
+            });
             
             // Create Memo program instruction to attach readable JSON
             const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');

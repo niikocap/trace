@@ -14,11 +14,12 @@ pub mod rice_supply_chain {
     ) -> Result<()> {
         let transaction = &mut ctx.accounts.transaction;
 
+        // Log first to inspect payload then parse
+        msg!("✅ Received JSON: {}", json_data);
+
         // Parse and validate JSON
         let parsed_data: TransactionData = serde_json::from_str(&json_data)
             .map_err(|_| ErrorCode::InvalidTransactionData)?;
-
-        msg!("✅ Received JSON: {}", json_data);
         msg!(
             "From {} to {} | Qty: {} | Price: {}",
             parsed_data.from_actor_id,

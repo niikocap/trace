@@ -33,6 +33,7 @@ router.post('/sample', async (req, res) => {
         const sampleData = {
             from_actor_id: 1,
             to_actor_id: 2,
+            batch_ids: [],
             quantity: '50kg',
             unit_price: '200',
             payment_reference: 0,
