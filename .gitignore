@@ -115,7 +115,7 @@ Thumbs.db
 
 # Solana/Anchor specific
 target/
-!target/**/*.json
+!target/idl/
 test-ledger/
 .anchor/
 keypairs/
