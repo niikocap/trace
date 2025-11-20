@@ -1,38 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const database = require('../config/database');
-const { v4: uuidv4 } = require('uuid');
 
-// Initialize database connection
-database.connect();
+// Mock rice batches data - blockchain-only system
+const mockBatches = [
+    { id: 1, batch_number: 'BATCH-001', farmer_id: 1, farmer_name: 'Farmer John', production_season_id: 1, season_name: 'Summer 2025', harvest_date: '2025-08-15', quantity_kg: 1000, quality_score: 85 },
+    { id: 2, batch_number: 'BATCH-002', farmer_id: 2, farmer_name: 'Farmer Maria', production_season_id: 1, season_name: 'Summer 2025', harvest_date: '2025-08-20', quantity_kg: 1500, quality_score: 90 }
+];
 
 // GET /api/rice-batches - Get all rice batches
 router.get('/', async (req, res) => {
     try {
-        const { data: riceBatches, error } = await database.supabase
-            .from('rice_batches')
-            .select(`
-                *,
-                farmer:chain_actors!farmer_id(name),
-                production_season:production_seasons!production_season_id(season_name)
-            `)
-            .order('harvest_date', { ascending: false });
-
-        if (error) {
-            throw error;
-        }
-
-        // Transform the data to match expected format
-        const transformedData = riceBatches.map(batch => ({
-            ...batch,
-            farmer_name: batch.farmer?.name || null,
-            season_name: batch.production_season?.season_name || null
-        }));
-        
         res.json({
             success: true,
-            data: transformedData,
-            count: transformedData.length
+            data: mockBatches,
+            count: mockBatches.length
         });
     } catch (error) {
         console.error('Error fetching rice batches:', error);

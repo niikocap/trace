@@ -510,6 +510,8 @@ async function loadChainTransactions() {
         const response = await fetchData('/transactions');
         transactionsPaginationState.allData = response.data || [];
         
+        console.log('Loaded transactions:', transactionsPaginationState.allData.length);
+        
         // Enrich transaction data with actor names
         const actorsResponse = await fetchData('/chain-actors');
         const actors = actorsResponse.data || [];
@@ -532,6 +534,8 @@ async function loadChainTransactions() {
         renderTransactionFilters();
         renderTransactionPagination();
         renderChainTransactionsTable();
+        
+        console.log('Rendered transactions. Filtered data:', transactionsPaginationState.filteredData.length);
         
         // Setup header search and filter button
         setupTransactionHeaderControls();

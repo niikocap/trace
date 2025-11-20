@@ -1,6 +1,6 @@
 const { Connection, PublicKey, clusterApiUrl, Keypair, SystemProgram, Transaction, TransactionInstruction } = require('@solana/web3.js');
 const anchor = require('@coral-xyz/anchor');
-const { AnchorProvider, Program } = require('@coral-xyz/anchor');
+const { AnchorProvider, Program, web3 } = require('@coral-xyz/anchor');
 const fs = require('fs');
 const path = require('path');
 
@@ -51,9 +51,8 @@ class SolanaService {
         try {
             // Load wallet keypair from environment variable or local file
             let walletKeypair;
-            
+
             if (process.env.SOLANA_PRIVATE_KEY) {
-                // Production: Use environment variable
                 try {
                     const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
                     if (!Array.isArray(privateKeyArray) || privateKeyArray.length !== 64) {
@@ -64,7 +63,6 @@ class SolanaService {
                     throw new Error(`Failed to parse SOLANA_PRIVATE_KEY: ${parseError.message}`);
                 }
             } else {
-                // Development: Use local file
                 const walletPath = path.join(process.env.HOME || '/tmp', '.config/solana/id.json');
                 if (fs.existsSync(walletPath)) {
                     walletKeypair = Keypair.fromSecretKey(
@@ -74,34 +72,46 @@ class SolanaService {
                     throw new Error('No wallet keypair found. Set SOLANA_PRIVATE_KEY environment variable or ensure ~/.config/solana/id.json exists');
                 }
             }
-            
-            // Generate new keypair for transaction account
-            const transactionKeypair = Keypair.generate();
 
-            // Load IDL to obtain discriminator and build instruction data manually
-            const idlPath = path.join(__dirname, '../../solana-program/target/idl/rice_supply_chain.json');
-            const idl = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
-            const createIx = (idl.instructions || []).find(ix => ix.name === 'create_transaction');
-            if (!createIx || !Array.isArray(createIx.discriminator)) {
-                throw new Error('IDL missing create_transaction discriminator');
-            }
+            // Derive PDA: seeds = ["tx", authority, nonce]
+            const nonce = transactionData.nonce || 0;
+            const [transactionPda] = await PublicKey.findProgramAddress(
+                [Buffer.from('tx'), walletKeypair.publicKey.toBuffer(), Buffer.from([nonce])],
+                this.programId
+            );
 
-            // Build main instruction data: discriminator (8 bytes) + borsh string(json)
+            // Hash full JSON payload for data_hash
             const jsonData = JSON.stringify(transactionData);
-            const discriminator = Buffer.from(createIx.discriminator);
-            const data = Buffer.concat([discriminator, this.serializeString(jsonData)]);
+            const hash = require('crypto').createHash('sha256').update(jsonData).digest();
 
-            const instruction = new TransactionInstruction({
+            // Build instruction manually without using Anchor Program interface
+            const discriminator = Buffer.from([227, 193, 53, 239, 55, 126, 112, 105]); // create_transaction discriminator
+            
+            // Serialize instruction data manually
+            let instructionData = Buffer.alloc(0);
+            instructionData = Buffer.concat([instructionData, discriminator]);
+            
+            // Serialize arguments in order: from_actor_id, to_actor_id, quantity, unit_price, payment_reference, nonce
+            // NOTE: data_hash is now computed in backend and returned, not sent to blockchain
+            instructionData = Buffer.concat([instructionData, this.serializeU64(transactionData.from_actor_id)]);
+            instructionData = Buffer.concat([instructionData, this.serializeU64(transactionData.to_actor_id)]);
+            instructionData = Buffer.concat([instructionData, this.serializeU64(parseInt(transactionData.quantity || '0'))]);
+            instructionData = Buffer.concat([instructionData, this.serializeU64(parseInt(transactionData.unit_price || '0'))]);
+            instructionData = Buffer.concat([instructionData, this.serializeU8(transactionData.payment_reference)]);
+            instructionData = Buffer.concat([instructionData, this.serializeU8(nonce)]);
+
+            // Create instruction
+            const ix = new TransactionInstruction({
                 programId: this.programId,
                 keys: [
-                    { pubkey: transactionKeypair.publicKey, isSigner: true, isWritable: true },
+                    { pubkey: transactionPda, isSigner: false, isWritable: true },
                     { pubkey: walletKeypair.publicKey, isSigner: true, isWritable: true },
                     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
                 ],
-                data,
+                data: instructionData,
             });
-            
-            // Create Memo program instruction to attach readable JSON
+
+            // Memo instruction with full JSON
             const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
             const memoInstruction = new TransactionInstruction({
                 programId: MEMO_PROGRAM_ID,
@@ -109,32 +119,129 @@ class SolanaService {
                 data: Buffer.from(jsonData, 'utf8'),
             });
 
-            // Create and send transaction (main ix + memo ix)
-            const transaction = new Transaction().add(instruction, memoInstruction);
-            
-            // Get recent blockhash
-            const { blockhash } = await this.connection.getLatestBlockhash();
+            const transaction = new Transaction().add(ix, memoInstruction);
+
+            const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = walletKeypair.publicKey;
-            
-            const signature = await this.connection.sendTransaction(transaction, [walletKeypair, transactionKeypair], {
+
+            const signature = await this.connection.sendTransaction(transaction, [walletKeypair], {
                 commitment: 'confirmed',
-                preflightCommitment: 'confirmed'
+                preflightCommitment: 'confirmed',
             });
-            
-            // Wait for confirmation with timeout
-            const confirmation = await this.connection.confirmTransaction({
-                signature,
-                blockhash,
-                lastValidBlockHeight: (await this.connection.getLatestBlockhash()).lastValidBlockHeight
-            }, 'confirmed');
-            
+
+            await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+
             return {
                 signature,
-                publicKey: transactionKeypair.publicKey.toString()
+                publicKey: transactionPda.toString(),
+                data_hash: hash.toString('hex'),
             };
         } catch (error) {
             console.error('Error creating real transaction:', error);
+            throw error;
+        }
+    }
+
+    // Phase 2: Add transaction to existing account (295× cheaper - no rent deposit)
+    async addTransactionToExisting(transactionData, publicKey) {
+        try {
+            // Load wallet keypair from environment variable or local file
+            let walletKeypair;
+
+            if (process.env.SOLANA_PRIVATE_KEY) {
+                try {
+                    const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
+                    if (!Array.isArray(privateKeyArray) || privateKeyArray.length !== 64) {
+                        throw new Error(`Invalid private key format. Expected array of 64 numbers, got ${privateKeyArray.length} elements`);
+                    }
+                    walletKeypair = Keypair.fromSecretKey(Uint8Array.from(privateKeyArray));
+                } catch (parseError) {
+                    throw new Error(`Failed to parse SOLANA_PRIVATE_KEY: ${parseError.message}`);
+                }
+            } else {
+                const walletPath = path.join(process.env.HOME || '/tmp', '.config/solana/id.json');
+                if (fs.existsSync(walletPath)) {
+                    walletKeypair = Keypair.fromSecretKey(
+                        Uint8Array.from(JSON.parse(fs.readFileSync(walletPath, 'utf8')))
+                    );
+                } else {
+                    throw new Error('No wallet keypair found. Set SOLANA_PRIVATE_KEY environment variable or ensure ~/.config/solana/id.json exists');
+                }
+            }
+
+            const crypto = require('crypto');
+            
+            // Compute data hash
+            const jsonData = JSON.stringify(transactionData);
+            const hash = crypto.createHash('sha256').update(jsonData).digest();
+
+            // Derive PDA from existing public key
+            const transactionPda = new PublicKey(publicKey);
+
+            // Get account info to verify it exists
+            const accountInfo = await this.connection.getAccountInfo(transactionPda);
+            if (!accountInfo) {
+                throw new Error('Account does not exist. Use createRealTransaction first.');
+            }
+
+            // Build instruction for add_transaction (no nonce parameter needed)
+            const discriminator = Buffer.from([48, 96, 174, 112, 81, 30, 239, 89]); // add_transaction discriminator
+            let instructionData = discriminator;
+            
+            // Serialize arguments in order: from_actor_id, to_actor_id, quantity, unit_price, payment_reference
+            instructionData = Buffer.concat([instructionData, this.serializeU64(transactionData.from_actor_id)]);
+            instructionData = Buffer.concat([instructionData, this.serializeU64(transactionData.to_actor_id)]);
+            instructionData = Buffer.concat([instructionData, this.serializeU64(parseInt(transactionData.quantity || '0'))]);
+            instructionData = Buffer.concat([instructionData, this.serializeU64(parseInt(transactionData.unit_price || '0'))]);
+            instructionData = Buffer.concat([instructionData, this.serializeU8(transactionData.payment_reference)]);
+
+            // Create instruction
+            const instruction = new TransactionInstruction({
+                keys: [
+                    { pubkey: transactionPda, isSigner: false, isWritable: true },
+                    { pubkey: walletKeypair.publicKey, isSigner: true, isWritable: false }
+                ],
+                programId: this.programId,
+                data: instructionData
+            });
+
+            // Create memo instruction with full transaction data
+            const memoInstruction = new TransactionInstruction({
+                keys: [{ pubkey: walletKeypair.publicKey, isSigner: true, isWritable: false }],
+                programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
+                data: Buffer.from(jsonData, 'utf8')
+            });
+
+            // Get latest blockhash
+            const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
+
+            // Create transaction
+            const transaction = new Transaction({
+                recentBlockhash: blockhash,
+                feePayer: walletKeypair.publicKey
+            });
+
+            transaction.add(instruction);
+            transaction.add(memoInstruction);
+
+            // Sign and send
+            transaction.sign(walletKeypair);
+
+            const signature = await this.connection.sendTransaction(transaction, [walletKeypair], {
+                commitment: 'confirmed',
+                preflightCommitment: 'confirmed',
+            });
+
+            await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+
+            return {
+                signature,
+                publicKey: transactionPda.toString(),
+                data_hash: hash.toString('hex'),
+            };
+        } catch (error) {
+            console.error('Error adding transaction to existing account:', error);
             throw error;
         }
     }
@@ -183,6 +290,8 @@ class SolanaService {
         try {
             // Get all accounts owned by our program
             const accounts = await this.connection.getProgramAccounts(this.programId);
+            console.log(`Found ${accounts.length} accounts for program ${this.programId.toString()}`);
+            
             const transactions = [];
             
             for (const account of accounts) {
@@ -190,31 +299,25 @@ class SolanaService {
                     // Try to decode the account data
                     const decoded = this.decodeTransactionAccount(account.account.data);
                     if (decoded && decoded.from_actor_id !== undefined) {
-                        // Get transaction signatures for this account
-                        let signature = null;
-                        try {
-                            const signatures = await this.connection.getSignaturesForAddress(account.pubkey, { limit: 1 });
-                            if (signatures && signatures.length > 0) {
-                                signature = signatures[0].signature;
-                            }
-                        } catch (sigError) {
-                            console.warn('Could not fetch signature for account:', account.pubkey.toString());
-                        }
-                        
+                        // Use the timestamp from the account as the signature (no extra RPC call)
+                        // This avoids rate limiting issues
                         transactions.push({
                             publicKey: account.pubkey.toString(),
-                            signature: signature || account.pubkey.toString(), // fallback to pubkey if no signature
+                            signature: account.pubkey.toString(), // Use pubkey as fallback signature
                             ...decoded,
                             blockchain_verified: true,
                             lamports: account.account.lamports,
                             owner: account.account.owner.toString()
                         });
+                    } else {
+                        // Silently skip invalid accounts to reduce log noise
                     }
                 } catch (err) {
-                    console.warn('Failed to decode account:', account.pubkey.toString(), err.message);
+                    // Silently skip decode errors to reduce log noise
                 }
             }
             
+            console.log(`Decoded ${transactions.length} valid transactions`);
             return transactions;
         } catch (error) {
             console.error('Error fetching transactions:', error);
@@ -246,48 +349,74 @@ class SolanaService {
                 return null;
             }
             
+            // TransactionAccount structure (56 bytes total):
+            // Discriminator: 8 bytes (skipped by Anchor)
+            // from_actor_id: u64 (8 bytes)
+            // to_actor_id: u64 (8 bytes)
+            // quantity: u64 (8 bytes)
+            // unit_price: u64 (8 bytes)
+            // payment_reference: u8 (1 byte)
+            // timestamp: i64 (8 bytes)
+            // bump: u8 (1 byte)
+            // nonce: u8 (1 byte)
+            // transaction_count: u64 (8 bytes)
+            
             let offset = 8; // Skip discriminator
             
-            // Read JSON string length
-            if (offset + 4 > data.length) return null;
-            const jsonLength = data.readUInt32LE(offset);
-            offset += 4;
-            
-            // Read JSON string
-            if (offset + jsonLength > data.length) return null;
-            const jsonString = data.subarray(offset, offset + jsonLength).toString('utf8');
-            offset += jsonLength;
-            
-            // Validate JSON string before parsing
-            if (!jsonString || jsonString.trim() === '' || jsonLength === 0) {
-                return null;
-            }
-            
-            // Parse JSON data
-            let transactionData;
-            try {
-                transactionData = JSON.parse(jsonString);
-            } catch (parseError) {
-                // Silently skip invalid JSON data instead of logging errors
-                return null;
-            }
-            
-            // Read timestamps
+            // Read on-chain fields
             if (offset + 8 > data.length) return null;
-            const created_at = Number(data.readBigInt64LE(offset));
+            const from_actor_id = Number(data.readBigUInt64LE(offset));
             offset += 8;
             
             if (offset + 8 > data.length) return null;
-            const updated_at = Number(data.readBigInt64LE(offset));
+            const to_actor_id = Number(data.readBigUInt64LE(offset));
             offset += 8;
             
-            // Add metadata
+            if (offset + 8 > data.length) return null;
+            const quantity = Number(data.readBigUInt64LE(offset));
+            offset += 8;
+            
+            if (offset + 8 > data.length) return null;
+            const unit_price = Number(data.readBigUInt64LE(offset));
+            offset += 8;
+            
+            if (offset + 1 > data.length) return null;
+            const payment_reference = data.readUInt8(offset);
+            offset += 1;
+            
+            if (offset + 8 > data.length) return null;
+            const timestamp = Number(data.readBigInt64LE(offset));
+            offset += 8;
+            
+            if (offset + 1 > data.length) return null;
+            const bump = data.readUInt8(offset);
+            offset += 1;
+            
+            if (offset + 1 > data.length) return null;
+            const nonce = data.readUInt8(offset);
+            offset += 1;
+            
+            if (offset + 8 > data.length) return null;
+            const transaction_count = Number(data.readBigUInt64LE(offset));
+            offset += 8;
+            
+            // Return decoded transaction data
             return {
-                ...transactionData,
-                created_at,
-                updated_at,
-                json_data: jsonString, // Include raw JSON for transparency
-                data_format: 'json' // Mark as JSON format for frontend
+                from_actor_id,
+                to_actor_id,
+                quantity: quantity.toString(),
+                unit_price: unit_price.toString(),
+                payment_reference,
+                timestamp,
+                bump,
+                nonce,
+                transaction_count,
+                created_at: timestamp,
+                updated_at: timestamp,
+                batch_ids: [],
+                status: 'completed',
+                is_test: 0,
+                data_format: 'binary' // Mark as binary format (on-chain only)
             };
         } catch (error) {
             console.error('Error decoding transaction account:', error);

@@ -1,26 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const database = require('../config/database');
 
-// Initialize database connection
-database.connect();
+// Mock production seasons data - blockchain-only system
+const mockSeasons = [
+    { id: 1, season_name: 'Summer 2025', start_date: '2025-03-01', end_date: '2025-08-31', variety: 'Jasmine', carbon_certified: true },
+    { id: 2, season_name: 'Winter 2025', start_date: '2025-09-01', end_date: '2026-02-28', variety: 'Basmati', carbon_certified: false }
+];
 
 // GET /api/production-seasons - Get all production seasons
 router.get('/', async (req, res) => {
     try {
-        const { data: seasons, error } = await database.supabase
-            .from('production_seasons')
-            .select('*')
-            .order('start_date', { ascending: false });
-
-        if (error) {
-            throw error;
-        }
-
         res.json({
             success: true,
-            data: seasons || [],
-            count: seasons?.length || 0
+            data: mockSeasons,
+            count: mockSeasons.length
         });
     } catch (error) {
         console.error('Error fetching production seasons:', error);

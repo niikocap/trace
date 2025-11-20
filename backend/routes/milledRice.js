@@ -1,37 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const database = require('../config/database');
 
-// Initialize database connection
-database.connect();
+// Mock milled rice data - blockchain-only system
+const mockMilledRice = [
+    { id: 1, batch_id: 1, batch_number: 'BATCH-001', miller_id: 3, miller_name: 'Miller Bob', milling_date: '2025-08-25', quantity_milled_kg: 950, quality_score: 88 },
+    { id: 2, batch_id: 2, batch_number: 'BATCH-002', miller_id: 3, miller_name: 'Miller Bob', milling_date: '2025-08-30', quantity_milled_kg: 1425, quality_score: 92 }
+];
 
 // GET /api/milled-rice - Get all milled rice records
 router.get('/', async (req, res) => {
     try {
-        const { data: milledRice, error } = await database.supabase
-            .from('milled_rice')
-            .select(`
-                *,
-                rice_batch:rice_batches!batch_id(batch_number),
-                miller:chain_actors!miller_id(name)
-            `)
-            .order('milling_date', { ascending: false });
-
-        if (error) {
-            throw error;
-        }
-
-        // Transform the data to match expected format
-        const transformedData = milledRice?.map(rice => ({
-            ...rice,
-            batch_number: rice.rice_batch?.batch_number || null,
-            miller_name: rice.miller?.name || null
-        })) || [];
-        
         res.json({
             success: true,
-            data: transformedData,
-            count: transformedData.length
+            data: mockMilledRice,
+            count: mockMilledRice.length
         });
     } catch (error) {
         console.error('Error fetching milled rice:', error);

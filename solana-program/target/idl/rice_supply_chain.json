@@ -8,6 +8,51 @@
   },
   "instructions": [
     {
+      "name": "add_transaction",
+      "discriminator": [
+        48,
+        96,
+        174,
+        112,
+        81,
+        30,
+        239,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "transaction",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "from_actor_id",
+          "type": "u64"
+        },
+        {
+          "name": "to_actor_id",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        },
+        {
+          "name": "unit_price",
+          "type": "u64"
+        },
+        {
+          "name": "payment_reference",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "create_transaction",
       "discriminator": [
         227,
@@ -15,15 +60,14 @@
         53,
         239,
         55,
-        126, 
+        126,
         112,
         105
       ],
       "accounts": [
         {
           "name": "transaction",
-          "writable": true,
-          "signer": true
+          "writable": true
         },
         {
           "name": "authority",
@@ -37,8 +81,28 @@
       ],
       "args": [
         {
-          "name": "json_data",
-          "type": "string"
+          "name": "from_actor_id",
+          "type": "u64"
+        },
+        {
+          "name": "to_actor_id",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        },
+        {
+          "name": "unit_price",
+          "type": "u64"
+        },
+        {
+          "name": "payment_reference",
+          "type": "u8"
+        },
+        {
+          "name": "nonce",
+          "type": "u8"
         }
       ]
     },
@@ -61,73 +125,99 @@
         },
         {
           "name": "authority",
-          "signer": true,
-          "relations": [
-            "transaction"
-          ]
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "json_data",
-          "type": "string"
+          "name": "quantity",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "unit_price",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "payment_reference",
+          "type": {
+            "option": "u8"
+          }
         }
       ]
     }
   ],
   "accounts": [
     {
-      "name": "ChainTransaction",
+      "name": "TransactionAccount",
       "discriminator": [
-        201,
-        93,
-        106,
-        115,
-        255,
-        110,
-        36,
-        116
+        146,
+        125,
+        253,
+        167,
+        250,
+        226,
+        175,
+        123
       ]
     }
   ],
   "errors": [
     {
       "code": 6000,
-      "name": "TransactionNotFound",
-      "msg": "Transaction not found"
+      "name": "InvalidNonce",
+      "msg": "Invalid nonce or PDA derivation"
     },
     {
       "code": 6001,
-      "name": "Unauthorized",
-      "msg": "Unauthorized access"
-    },
-    {
-      "code": 6002,
-      "name": "InvalidTransactionData",
-      "msg": "Invalid transaction data"
+      "name": "BumpNotFound",
+      "msg": "Bump not found in context"
     }
   ],
   "types": [
     {
-      "name": "ChainTransaction",
+      "name": "TransactionAccount",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "json_data",
-            "type": "string"
+            "name": "from_actor_id",
+            "type": "u64"
           },
           {
-            "name": "created_at",
+            "name": "to_actor_id",
+            "type": "u64"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "unit_price",
+            "type": "u64"
+          },
+          {
+            "name": "payment_reference",
+            "type": "u8"
+          },
+          {
+            "name": "timestamp",
             "type": "i64"
           },
           {
-            "name": "updated_at",
-            "type": "i64"
+            "name": "bump",
+            "type": "u8"
           },
           {
-            "name": "authority",
-            "type": "pubkey"
+            "name": "nonce",
+            "type": "u8"
+          },
+          {
+            "name": "transaction_count",
+            "type": "u64"
           }
         ]
       }

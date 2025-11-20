@@ -1,6 +1,4 @@
 use anchor_lang::prelude::*;
-use serde::{Deserialize, Serialize};
-use serde_json;
 
 declare_id!("FS1fWouL7tpGRTErvRcdcWpgU2BsSuTfbEpEDBufWF1N");
 
@@ -8,104 +6,174 @@ declare_id!("FS1fWouL7tpGRTErvRcdcWpgU2BsSuTfbEpEDBufWF1N");
 pub mod rice_supply_chain {
     use super::*;
 
+    // Phase 1: Create new account (original behavior)
     pub fn create_transaction(
         ctx: Context<CreateTransaction>,
-        json_data: String,
+        from_actor_id: u64,
+        to_actor_id: u64,
+        quantity: u64,
+        unit_price: u64,
+        payment_reference: u8,
+        nonce: u8,
     ) -> Result<()> {
-        let transaction = &mut ctx.accounts.transaction;
+        let tx = &mut ctx.accounts.transaction;
 
-        // Log first to inspect payload then parse
-        msg!("✅ Received JSON: {}", json_data);
+        // Initialize on first use
+        if tx.nonce == 0 && tx.transaction_count == 0 {
+            tx.bump = ctx.bumps.transaction;
+            tx.nonce = nonce;
+        }
 
-        // Parse and validate JSON
-        let parsed_data: TransactionData = serde_json::from_str(&json_data)
-            .map_err(|_| ErrorCode::InvalidTransactionData)?;
+        tx.from_actor_id = from_actor_id;
+        tx.to_actor_id = to_actor_id;
+        tx.quantity = quantity;
+        tx.unit_price = unit_price;
+        tx.payment_reference = payment_reference;
+        tx.timestamp = Clock::get()?.unix_timestamp;
+        tx.transaction_count = tx.transaction_count.saturating_add(1);
+
         msg!(
-            "From {} to {} | Qty: {} | Price: {}",
-            parsed_data.from_actor_id,
-            parsed_data.to_actor_id,
-            parsed_data.quantity,
-            parsed_data.unit_price
+            "tx created: from={} to={} qty={} price={} nonce={} count={}",
+            from_actor_id,
+            to_actor_id,
+            quantity,
+            unit_price,
+            nonce,
+            tx.transaction_count
         );
 
-        transaction.json_data = json_data;
-        transaction.created_at = Clock::get()?.unix_timestamp;
-        transaction.updated_at = transaction.created_at;
-        transaction.authority = ctx.accounts.authority.key();
+        Ok(())
+    }
+
+    // Phase 2: Reuse existing account (295× cheaper - no rent deposit)
+    pub fn add_transaction(
+        ctx: Context<AddTransaction>,
+        from_actor_id: u64,
+        to_actor_id: u64,
+        quantity: u64,
+        unit_price: u64,
+        payment_reference: u8,
+    ) -> Result<()> {
+        let tx = &mut ctx.accounts.transaction;
+
+        // Update transaction data (reuse existing account)
+        tx.from_actor_id = from_actor_id;
+        tx.to_actor_id = to_actor_id;
+        tx.quantity = quantity;
+        tx.unit_price = unit_price;
+        tx.payment_reference = payment_reference;
+        tx.timestamp = Clock::get()?.unix_timestamp;
+        tx.transaction_count = tx.transaction_count.saturating_add(1);
+
+        msg!(
+            "tx added (reused): from={} to={} qty={} price={} count={}",
+            from_actor_id,
+            to_actor_id,
+            quantity,
+            unit_price,
+            tx.transaction_count
+        );
 
         Ok(())
     }
 
     pub fn update_transaction(
         ctx: Context<UpdateTransaction>,
-        json_data: String,
+        quantity: Option<u64>,
+        unit_price: Option<u64>,
+        payment_reference: Option<u8>,
     ) -> Result<()> {
-        let transaction = &mut ctx.accounts.transaction;
+        let tx = &mut ctx.accounts.transaction;
 
-        let _parsed_data: TransactionData = serde_json::from_str(&json_data)
-            .map_err(|_| ErrorCode::InvalidTransactionData)?;
+        if let Some(q) = quantity {
+            tx.quantity = q;
+        }
+        if let Some(p) = unit_price {
+            tx.unit_price = p;
+        }
+        if let Some(r) = payment_reference {
+            tx.payment_reference = r;
+        }
 
-        transaction.json_data = json_data;
-        transaction.updated_at = Clock::get()?.unix_timestamp;
+        tx.timestamp = Clock::get()?.unix_timestamp;
+        msg!("tx updated: {} count={}", tx.timestamp, tx.transaction_count);
 
         Ok(())
     }
 }
 
 #[derive(Accounts)]
+#[instruction(from_actor_id: u64, to_actor_id: u64, quantity: u64, unit_price: u64, payment_reference: u8, nonce: u8)]
 pub struct CreateTransaction<'info> {
     #[account(
         init,
         payer = authority,
-        // 8 (discriminator) + 4 + 2048 (json_data String) + 8 (created_at) + 8 (updated_at) + 32 (authority)
-        space = 8 + (4 + 2048) + 8 + 8 + 32,
+        space = TransactionAccount::SPACE,
+        seeds = [b"tx", authority.key().as_ref(), &[nonce]],
+        bump
     )]
-    pub transaction: Account<'info, ChainTransaction>,
+    pub transaction: Account<'info, TransactionAccount>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
+
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AddTransaction<'info> {
+    #[account(
+        mut,
+        seeds = [b"tx", authority.key().as_ref(), &[transaction.nonce]],
+        bump = transaction.bump,
+    )]
+    pub transaction: Account<'info, TransactionAccount>,
+
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct UpdateTransaction<'info> {
     #[account(
         mut,
-        has_one = authority,
+        seeds = [b"tx", authority.key().as_ref(), &[transaction.nonce]],
+        bump = transaction.bump,
     )]
-    pub transaction: Account<'info, ChainTransaction>,
+    pub transaction: Account<'info, TransactionAccount>,
+
     pub authority: Signer<'info>,
 }
 
 #[account]
-pub struct ChainTransaction {
-    pub json_data: String,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub authority: Pubkey,
-}
-
-// Removed Space trait usage; space is specified directly in the init attribute above.
-
-#[derive(Serialize, Deserialize)]
-pub struct TransactionData {
+pub struct TransactionAccount {
     pub from_actor_id: u64,
     pub to_actor_id: u64,
-    pub batch_ids: Vec<u64>,
-    pub quantity: String,
-    pub unit_price: String,
-    pub payment_reference: u8, // 0=cash, 1=cheque, 2=balance
-    pub transaction_date: String,
-    pub status: String,
-    pub quality: Option<u8>, // 0=premium, etc.
-    pub moisture: Option<String>,
+    pub quantity: u64,
+    pub unit_price: u64,
+    pub payment_reference: u8,
+    pub timestamp: i64,
+    pub bump: u8,
+    pub nonce: u8,
+    pub transaction_count: u64,
+}
+
+impl TransactionAccount {
+    pub const SPACE: usize = 8
+        + 8
+        + 8
+        + 8
+        + 8
+        + 1
+        + 8
+        + 1
+        + 1
+        + 8;
 }
 
 #[error_code]
 pub enum ErrorCode {
-    #[msg("Transaction not found")]
-    TransactionNotFound,
-    #[msg("Unauthorized access")]
-    Unauthorized,
-    #[msg("Invalid transaction data")]
-    InvalidTransactionData,
+    #[msg("Invalid nonce or PDA derivation")]
+    InvalidNonce,
+    #[msg("Bump not found in context")]
+    BumpNotFound,
 }

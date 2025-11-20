@@ -1,26 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const database = require('../config/database');
 
-// Initialize database connection
-database.connect();
+// Mock chain actors data - blockchain-only system
+const mockActors = [
+    { id: 1, name: 'Farmer John', type: 'farmer', contact_info: '555-0001', location: 'Region A', group: 'Group 1' },
+    { id: 2, name: 'Farmer Maria', type: 'farmer', contact_info: '555-0002', location: 'Region B', group: 'Group 1' },
+    { id: 3, name: 'Miller Bob', type: 'miller', contact_info: '555-0003', location: 'Region C', group: 'Group 2' },
+    { id: 4, name: 'Trader Alice', type: 'trader', contact_info: '555-0004', location: 'Region D', group: 'Group 3' }
+];
 
 // GET /api/chain-actors - Get all chain actors
 router.get('/', async (req, res) => {
     try {
-        const { data: actors, error } = await database.supabase
-            .from('chain_actors')
-            .select('*')
-            .order('name', { ascending: true });
-
-        if (error) {
-            throw error;
-        }
-
         res.json({
             success: true,
-            data: actors || [],
-            count: actors?.length || 0
+            data: mockActors,
+            count: mockActors.length
         });
     } catch (error) {
         console.error('Error fetching chain actors:', error);

@@ -29,7 +29,7 @@ router.get('/', async (req, res) => {
 // POST /api/transactions/sample - Create a sample transaction (with Memo)
 router.post('/sample', async (req, res) => {
     try {
-        // Fixed sample based on user request
+        // Fixed sample based on user request, but allow nonce override
         const sampleData = {
             from_actor_id: 1,
             to_actor_id: 2,
@@ -38,7 +38,9 @@ router.post('/sample', async (req, res) => {
             unit_price: '200',
             payment_reference: 0,
             transaction_date: new Date().toISOString(),
-            status: 'completed'
+            status: 'completed',
+            is_test: 1,
+            nonce: req.body.nonce || 0
         };
 
         const result = await solanaService.createRealTransaction(sampleData);
@@ -49,6 +51,7 @@ router.post('/sample', async (req, res) => {
                 ...sampleData,
                 publicKey: result.publicKey,
                 signature: result.signature,
+                data_hash: result.data_hash,
                 blockchain_verified: true,
                 created_at: Date.now(),
                 updated_at: Date.now()
@@ -116,7 +119,9 @@ router.post('/', async (req, res) => {
             payment_reference,
             status,
             quality,
-            moisture
+            moisture,
+            is_test,
+            nonce
         } = req.body;
         
         // Validate required fields
@@ -148,7 +153,9 @@ router.post('/', async (req, res) => {
             transaction_date: new Date().toISOString(),
             status: status || 'completed',
             quality: quality !== undefined ? parseInt(quality) : null,
-            moisture: moisture || null
+            moisture: moisture || null,
+            is_test: is_test !== undefined ? Number(is_test) : 1,
+            nonce: nonce !== undefined ? nonce : 0
         };
         
         // Create real blockchain transaction
@@ -160,6 +167,7 @@ router.post('/', async (req, res) => {
                 ...transactionData,
                 publicKey: result.publicKey,
                 signature: result.signature,
+                data_hash: result.data_hash,
                 blockchain_verified: true,
                 created_at: Date.now(),
                 updated_at: Date.now()
