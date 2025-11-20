@@ -50,12 +50,21 @@ body {
     z-index: 1030;
     height: 60px;
     box-shadow: var(--card-shadow);
+    padding: 0.5rem 1rem !important;
 }
 
 .top-navbar .navbar-brand {
     color: var(--text-primary);
     font-size: 1.1rem;
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.top-navbar .container-fluid {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
 }
 
 .theme-toggle {
@@ -69,6 +78,7 @@ body {
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    flex-shrink: 0;
 }
 
 .theme-toggle:hover {
@@ -87,6 +97,73 @@ body {
     justify-content: center;
     color: white;
     font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.sidebar-toggle {
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.sidebar-toggle:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+}
+
+@media (max-width: 767.98px) {
+    .sidebar-toggle {
+        display: flex !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .top-navbar {
+        height: 50px;
+        padding: 0.35rem 0.5rem !important;
+    }
+    
+    .top-navbar .navbar-brand {
+        font-size: 0.75rem;
+        flex: 1;
+    }
+    
+    .top-navbar .container-fluid {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+        gap: 0.5rem;
+    }
+    
+    .sidebar-toggle {
+        width: 32px;
+        height: 32px;
+        font-size: 0.75rem;
+    }
+    
+    .theme-toggle {
+        width: 32px;
+        height: 32px;
+        font-size: 0.75rem;
+    }
+    
+    .user-avatar {
+        width: 28px;
+        height: 28px;
+        font-size: 0.7rem;
+    }
+    
+    .d-flex.align-items-center.gap-2 {
+        gap: 0.25rem !important;
+    }
 }
 
 /* Sidebar Styles */
@@ -181,8 +258,10 @@ body {
     .sidebar {
         top: 60px;
         padding-top: 1rem;
+        width: 250px;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
+        z-index: 1000;
     }
     
     .sidebar.show {
@@ -193,6 +272,110 @@ body {
         margin-left: 0;
         padding: 1rem;
         padding-top: 80px;
+    }
+    
+    .page-title {
+        font-size: 1.25rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .table {
+        font-size: 0.75rem;
+    }
+    
+    .table th, .table td {
+        padding: 0.5rem;
+    }
+    
+    .btn-sm {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.65rem;
+    }
+    
+    .form-control, .form-select {
+        font-size: 16px;
+        padding: 0.5rem;
+    }
+    
+    .pagination {
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    
+    .pagination .page-link {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .d-flex {
+        flex-wrap: wrap;
+    }
+    
+    .gap-2 {
+        gap: 0.5rem !important;
+    }
+    
+    .row {
+        margin-right: -0.5rem;
+        margin-left: -0.5rem;
+    }
+    
+    .col-md-3, .col-md-4, .col-md-6 {
+        padding-right: 0.5rem;
+        padding-left: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .top-navbar .navbar-brand {
+        font-size: 0.9rem;
+    }
+    
+    .main-content {
+        padding: 0.75rem;
+        padding-top: 80px;
+    }
+    
+    .page-title {
+        font-size: 1rem;
+    }
+    
+    .card-header {
+        padding: 0.75rem 1rem;
+    }
+    
+    .card-body {
+        padding: 0.75rem;
+    }
+    
+    .table {
+        font-size: 0.7rem;
+    }
+    
+    .table th, .table td {
+        padding: 0.35rem;
+    }
+    
+    .btn {
+        padding: 0.35rem 0.75rem;
+        font-size: 0.7rem;
+    }
+    
+    .form-label {
+        font-size: 0.75rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .form-control, .form-select {
+        font-size: 14px;
+        padding: 0.35rem;
+    }
+    
+    .d-flex.gap-2 {
+        gap: 0.25rem !important;
     }
 }
 
@@ -362,6 +545,27 @@ body {
 .btn-danger:hover {
     background: linear-gradient(135deg, #e63a61 0%, #e64327 100%);
     transform: translateY(-1px);
+}
+
+/* Pagination - use accent color instead of default blue */
+.pagination .page-link {
+    color: var(--accent-color);
+}
+
+.pagination .page-link:hover {
+    color: #ffffff;
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #ffffff;
+}
+
+.pagination .page-item.disabled .page-link {
+    color: var(--text-muted);
 }
 
 .btn-sm {
@@ -717,6 +921,55 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
+}
+
+/* QR Scanner Fullscreen Overlay */
+.qr-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 2000;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+.qr-overlay-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+#qr-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+}
+
+.qr-frame {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 60vw;
+    max-width: 400px;
+    height: 60vw;
+    max-height: 400px;
+    transform: translate(-50%, -50%);
+    border: 3px solid #22c55e;
+    border-radius: 16px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+.qr-close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 10;
 }
 
 /* Print Styles */

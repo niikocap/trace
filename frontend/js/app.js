@@ -7,6 +7,23 @@ const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api`;
 // Global variables
 let currentSection = 'dashboard';
 let currentEntity = null;
+let transactionsPaginationState = {
+    allData: [],
+    filteredData: [],
+    currentPage: 1,
+    itemsPerPage: 10,
+    filters: {
+        status: '',
+        paymentMethod: '',
+        searchTerm: '',
+        dateFrom: '',
+        dateTo: '',
+        moistureMin: 0,
+        moistureMax: 100,
+        quantityMin: 0,
+        quantityMax: 10000
+    }
+};
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -17,9 +34,8 @@ function initializeApp() {
     setupEventListeners();
     initializeTheme();
     initializeApiTester();
-    loadDashboard();
-    loadRecentTransactions();
-    showSection('dashboard');
+    // Show chain transactions on load instead of dashboard
+    showSection('chain-transactions');
 }
 
 // API Tester
@@ -259,6 +275,26 @@ function updateThemeIcon(theme) {
 
 // Event Listeners
 function setupEventListeners() {
+    // Hamburger menu toggle
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar = document.querySelector('.sidebar');
+    
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            sidebar.classList.toggle('show');
+        });
+        
+        // Close sidebar when clicking on a nav link
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth < 768) {
+                    sidebar.classList.remove('show');
+                }
+            });
+        });
+    }
+    
     // Sidebar navigation
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', function(e) {
@@ -334,7 +370,7 @@ function showSection(section) {
     document.getElementById('page-title').textContent = titles[section];
     
     const addBtn = document.getElementById('add-btn');
-    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker') {
+    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker' || section === 'chain-transactions') {
         addBtn.style.display = 'none';
     } else {
         addBtn.style.display = 'block';
@@ -378,31 +414,35 @@ async function loadDashboard() {
         showLoading(true);
         
         // Load counts for dashboard cards
-        const [actors, batches, milled, transactions, seasons] = await Promise.all([
-            fetch(`${API_BASE_URL}/chain-actors`),
-            fetch(`${API_BASE_URL}/rice-batches`),
-            fetch(`${API_BASE_URL}/milled-rice`),
-            fetch(`${API_BASE_URL}/transactions`),
-            fetch(`${API_BASE_URL}/production-seasons`)
-        ]);
-
         const [actorsData, batchesData, milledData, transactionsData, seasonsData] = await Promise.all([
-            actors.json(),
-            batches.json(),
-            milled.json(),
-            transactions.json(),
-            seasons.json()
+            fetchData('/chain-actors').catch(() => ({ data: [] })),
+            fetchData('/rice-batches').catch(() => ({ data: [] })),
+            fetchData('/milled-rice').catch(() => ({ data: [] })),
+            fetchData('/transactions').catch(() => ({ data: [] })),
+            fetchData('/production-seasons').catch(() => ({ data: [] }))
         ]);
 
-        // Update dashboard cards
-        document.getElementById('actors-count').textContent = actorsData.success ? actorsData.data.length : '0';
-        document.getElementById('batches-count').textContent = batchesData.success ? batchesData.data.length : '0';
-        document.getElementById('milled-count').textContent = milledData.success ? milledData.data.length : '0';
-        document.getElementById('transactions-count').textContent = transactionsData.success ? transactionsData.data.length : '0';
-        document.getElementById('seasons-count').textContent = seasonsData.success ? seasonsData.data.length : '0';
+        // Update dashboard cards with safe data access
+        const actorsCount = (actorsData && actorsData.data && Array.isArray(actorsData.data)) ? actorsData.data.length : 0;
+        const batchesCount = (batchesData && batchesData.data && Array.isArray(batchesData.data)) ? batchesData.data.length : 0;
+        const milledCount = (milledData && milledData.data && Array.isArray(milledData.data)) ? milledData.data.length : 0;
+        const transactionsCount = (transactionsData && transactionsData.data && Array.isArray(transactionsData.data)) ? transactionsData.data.length : 0;
+        const seasonsCount = (seasonsData && seasonsData.data && Array.isArray(seasonsData.data)) ? seasonsData.data.length : 0;
+
+        document.getElementById('actors-count').textContent = actorsCount;
+        document.getElementById('batches-count').textContent = batchesCount;
+        document.getElementById('milled-count').textContent = milledCount;
+        document.getElementById('transactions-count').textContent = transactionsCount;
+        document.getElementById('seasons-count').textContent = seasonsCount;
         
     } catch (error) {
         console.error('Error loading dashboard:', error);
+        // Set default values on error
+        document.getElementById('actors-count').textContent = '0';
+        document.getElementById('batches-count').textContent = '0';
+        document.getElementById('milled-count').textContent = '0';
+        document.getElementById('transactions-count').textContent = '0';
+        document.getElementById('seasons-count').textContent = '0';
         showToast('Error loading dashboard data', 'error');
     } finally {
         showLoading(false);
@@ -426,8 +466,10 @@ async function loadChainActors() {
 async function loadProductionSeasons() {
     try {
         showTableLoading('seasons-tbody');
-        const response = await fetchData('/production-seasons');
-        currentData = response.data || [];
+        // Fetch from external API
+        const response = await fetch('https://digisaka.online/api/mobile/trace/season/get-all');
+        const data = await response.json();
+        currentData = data.data || [];
         renderProductionSeasonsTable(currentData);
     } catch (error) {
         console.error('Error loading production seasons:', error);
@@ -466,7 +508,7 @@ async function loadChainTransactions() {
     try {
         showTableLoading('transactions-tbody');
         const response = await fetchData('/transactions');
-        currentData = response.data || [];
+        transactionsPaginationState.allData = response.data || [];
         
         // Enrich transaction data with actor names
         const actorsResponse = await fetchData('/chain-actors');
@@ -479,16 +521,56 @@ async function loadChainTransactions() {
         });
         
         // Add actor names to transactions
-        currentData.forEach(transaction => {
+        transactionsPaginationState.allData.forEach(transaction => {
             transaction.from_actor_name = actorMap[transaction.from_actor_id] || null;
             transaction.to_actor_name = actorMap[transaction.to_actor_id] || null;
         });
         
-        renderChainTransactionsTable(currentData);
+        // Initialize filters and pagination
+        transactionsPaginationState.currentPage = 1;
+        applyTransactionFilters();
+        renderTransactionFilters();
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+        
+        // Setup header search and filter button
+        setupTransactionHeaderControls();
     } catch (error) {
         console.error('Error loading chain transactions:', error);
         showToast('Error loading chain transactions', 'error');
         showTableError('transactions-tbody', 'Error loading chain transactions');
+    }
+}
+
+// Setup header search and filter button
+function setupTransactionHeaderControls() {
+    const searchInput = document.getElementById('transactions-search-header');
+    const filterBtn = document.getElementById('filter-toggle-btn-header');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            transactionsPaginationState.filters.searchTerm = e.target.value;
+            applyTransactionFilters();
+            transactionsPaginationState.currentPage = 1;
+            renderTransactionPagination();
+            renderChainTransactionsTable();
+        });
+    }
+    
+    if (filterBtn) {
+        filterBtn.addEventListener('click', () => {
+            const panel = document.getElementById('filters-panel');
+            if (panel) {
+                const isHidden = panel.style.display === 'none' || panel.style.display === '';
+                panel.style.display = isHidden ? 'block' : 'none';
+                // Update button appearance
+                if (isHidden) {
+                    filterBtn.classList.add('active');
+                } else {
+                    filterBtn.classList.remove('active');
+                }
+            }
+        });
     }
 }
 
@@ -585,26 +667,25 @@ function renderProductionSeasonsTable(data) {
     tbody.innerHTML = '';
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No production seasons found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No production seasons found</td></tr>';
         return;
     }
 
     data.forEach(season => {
         const row = document.createElement('tr');
+        const carbonCertified = season.carbon_smart_certified === 1 || season.carbon_smart_certified === true;
         row.innerHTML = `
             <td>${season.id}</td>
-            <td>${season.season_name}</td>
-            <td>${formatDate(season.planting_date)}</td>
-            <td>${formatDate(season.harvesting_date)}</td>
+            <td>${season.crop_year || '-'}</td>
             <td>${season.variety || '-'}</td>
-            <td><span class="badge ${season.carbon_certified ? 'bg-success' : 'bg-secondary'}">${season.carbon_certified ? 'Yes' : 'No'}</span></td>
-            <td>${season.farmer_id || '-'}</td>
+            <td>${formatDate(season.planting_date)}</td>
+            <td>${formatDate(season.harvest_date)}</td>
+            <td>${season.total_yield_kg || '0'} kg</td>
+            <td><span class="badge ${carbonCertified ? 'bg-success' : 'bg-secondary'}">${carbonCertified ? 'Yes' : 'No'}</span></td>
+            <td><span class="badge bg-${season.validation_status === 'pending' ? 'warning' : 'success'}">${season.validation_status || 'pending'}</span></td>
             <td class="action-buttons">
-                <button class="btn btn-sm btn-warning" onclick="editEntity('production_seasons', ${season.id})">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteEntity('production_seasons', ${season.id})">
-                    <i class="fas fa-trash"></i>
+                <button class="btn btn-sm btn-info" onclick="viewSeasonDetails(${season.id})">
+                    <i class="fas fa-eye"></i>
                 </button>
             </td>
         `;
@@ -680,16 +761,24 @@ function renderMilledRiceTable(data) {
     });
 }
 
-function renderChainTransactionsTable(data) {
+function renderChainTransactionsTable() {
     const tbody = document.getElementById('transactions-tbody');
     tbody.innerHTML = '';
 
+    const data = transactionsPaginationState.filteredData;
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No chain transactions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No chain transactions found</td></tr>';
         return;
     }
 
-    data.forEach(transaction => {
+    // Calculate pagination
+    const itemsPerPage = transactionsPaginationState.itemsPerPage;
+    const currentPage = transactionsPaginationState.currentPage;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = data.slice(startIndex, endIndex);
+
+    paginatedData.forEach(transaction => {
         const row = document.createElement('tr');
         
         // Display batch IDs without links
@@ -746,6 +835,377 @@ function renderChainTransactionsTable(data) {
         `;
         tbody.appendChild(row);
     });
+}
+
+// Apply transaction filters
+function applyTransactionFilters() {
+    const allData = transactionsPaginationState.allData;
+    const filters = transactionsPaginationState.filters;
+    
+    transactionsPaginationState.filteredData = allData.filter(transaction => {
+        // Filter by status
+        if (filters.status && transaction.status !== filters.status) {
+            return false;
+        }
+        
+        // Filter by payment method
+        if (filters.paymentMethod) {
+            let paymentRef = 'Cash';
+            if (transaction.payment_reference === 1) paymentRef = 'Cheque';
+            else if (transaction.payment_reference === 2) paymentRef = 'Balance';
+            
+            if (paymentRef !== filters.paymentMethod) {
+                return false;
+            }
+        }
+        
+        // Filter by date range
+        if (filters.dateFrom || filters.dateTo) {
+            const txDate = new Date(transaction.transaction_date);
+            if (filters.dateFrom) {
+                const fromDate = new Date(filters.dateFrom);
+                if (txDate < fromDate) return false;
+            }
+            if (filters.dateTo) {
+                const toDate = new Date(filters.dateTo);
+                toDate.setHours(23, 59, 59, 999);
+                if (txDate > toDate) return false;
+            }
+        }
+        
+        // Filter by moisture range
+        const moisture = parseFloat(transaction.moisture) || 0;
+        if (moisture < filters.moistureMin || moisture > filters.moistureMax) {
+            return false;
+        }
+        
+        // Filter by quantity range
+        const quantity = parseFloat(transaction.quantity) || 0;
+        if (quantity < filters.quantityMin || quantity > filters.quantityMax) {
+            return false;
+        }
+        
+        // Filter by search term (searches in actor names, batch IDs, etc.)
+        if (filters.searchTerm) {
+            const searchLower = filters.searchTerm.toLowerCase();
+            const searchableText = `
+                ${transaction.from_actor_name || ''} 
+                ${transaction.to_actor_name || ''} 
+                ${transaction.batch_ids ? transaction.batch_ids.join(' ') : ''}
+                ${transaction.quantity || ''}
+            `.toLowerCase();
+            
+            if (!searchableText.includes(searchLower)) {
+                return false;
+            }
+        }
+        
+        return true;
+    });
+    
+    // Reset to first page when filters change
+    transactionsPaginationState.currentPage = 1;
+}
+
+// Render transaction filters (collapsible panel)
+function renderTransactionFilters() {
+    const container = document.getElementById('transactions-filters-container');
+    if (!container) return;
+    
+    const html = `
+        <div id="filters-panel" class="card mb-3" style="display: none;">
+            <div class="card-body">
+                <div class="row g-3">
+                    <!-- Status Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label small mb-2">Status</label>
+                        <select class="form-select form-select-sm" id="transactions-status-filter">
+                            <option value="">All Status</option>
+                            <option value="completed" ${transactionsPaginationState.filters.status === 'completed' ? 'selected' : ''}>Completed</option>
+                            <option value="pending" ${transactionsPaginationState.filters.status === 'pending' ? 'selected' : ''}>Pending</option>
+                            <option value="cancelled" ${transactionsPaginationState.filters.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Payment Method Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label small mb-2">Payment Method</label>
+                        <select class="form-select form-select-sm" id="transactions-payment-filter">
+                            <option value="">All Payment Methods</option>
+                            <option value="Cash" ${transactionsPaginationState.filters.paymentMethod === 'Cash' ? 'selected' : ''}>Cash</option>
+                            <option value="Cheque" ${transactionsPaginationState.filters.paymentMethod === 'Cheque' ? 'selected' : ''}>Cheque</option>
+                            <option value="Balance" ${transactionsPaginationState.filters.paymentMethod === 'Balance' ? 'selected' : ''}>Balance</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Date Range Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label small mb-2">Date From</label>
+                        <input type="date" class="form-control form-control-sm" id="transactions-date-from" 
+                               value="${transactionsPaginationState.filters.dateFrom}">
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label small mb-2">Date To</label>
+                        <input type="date" class="form-control form-control-sm" id="transactions-date-to" 
+                               value="${transactionsPaginationState.filters.dateTo}">
+                    </div>
+                </div>
+                
+                <hr class="my-3">
+                
+                <div class="row g-3">
+                    <!-- Moisture Range Slider -->
+                    <div class="col-md-6">
+                        <label class="form-label small mb-2">Moisture Range: <span id="moisture-value">${transactionsPaginationState.filters.moistureMin}-${transactionsPaginationState.filters.moistureMax}%</span></label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="range" class="form-range" id="transactions-moisture-min" 
+                                   min="0" max="100" value="${transactionsPaginationState.filters.moistureMin}">
+                            <input type="range" class="form-range" id="transactions-moisture-max" 
+                                   min="0" max="100" value="${transactionsPaginationState.filters.moistureMax}">
+                        </div>
+                    </div>
+                    
+                    <!-- Quantity Range Slider -->
+                    <div class="col-md-6">
+                        <label class="form-label small mb-2">Quantity Range: <span id="quantity-value">${transactionsPaginationState.filters.quantityMin}-${transactionsPaginationState.filters.quantityMax}</span></label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="range" class="form-range" id="transactions-quantity-min" 
+                                   min="0" max="10000" step="10" value="${transactionsPaginationState.filters.quantityMin}">
+                            <input type="range" class="form-range" id="transactions-quantity-max" 
+                                   min="0" max="10000" step="10" value="${transactionsPaginationState.filters.quantityMax}">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-2 mt-3">
+                    <div class="col-12">
+                        <button class="btn btn-sm btn-outline-secondary w-100" id="clear-filters-btn">
+                            <i class="fas fa-times me-1"></i>Clear All Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    
+    // Attach event listeners
+    document.getElementById('transactions-status-filter').addEventListener('change', (e) => {
+        transactionsPaginationState.filters.status = e.target.value;
+        applyTransactionFilters();
+        transactionsPaginationState.currentPage = 1;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+    });
+    
+    document.getElementById('transactions-payment-filter').addEventListener('change', (e) => {
+        transactionsPaginationState.filters.paymentMethod = e.target.value;
+        applyTransactionFilters();
+        transactionsPaginationState.currentPage = 1;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+    });
+    
+    document.getElementById('transactions-date-from').addEventListener('change', (e) => {
+        transactionsPaginationState.filters.dateFrom = e.target.value;
+        applyTransactionFilters();
+        transactionsPaginationState.currentPage = 1;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+    });
+    
+    document.getElementById('transactions-date-to').addEventListener('change', (e) => {
+        transactionsPaginationState.filters.dateTo = e.target.value;
+        applyTransactionFilters();
+        transactionsPaginationState.currentPage = 1;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+    });
+    
+    // Moisture range sliders
+    const moistureMin = document.getElementById('transactions-moisture-min');
+    const moistureMax = document.getElementById('transactions-moisture-max');
+    const moistureValue = document.getElementById('moisture-value');
+    
+    moistureMin.addEventListener('input', (e) => {
+        if (parseInt(e.target.value) > parseInt(moistureMax.value)) {
+            moistureMax.value = e.target.value;
+        }
+        transactionsPaginationState.filters.moistureMin = parseInt(e.target.value);
+        moistureValue.textContent = `${transactionsPaginationState.filters.moistureMin}-${transactionsPaginationState.filters.moistureMax}%`;
+        applyTransactionFilters();
+        transactionsPaginationState.currentPage = 1;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+    });
+    
+    moistureMax.addEventListener('input', (e) => {
+        if (parseInt(e.target.value) < parseInt(moistureMin.value)) {
+            moistureMin.value = e.target.value;
+        }
+        transactionsPaginationState.filters.moistureMax = parseInt(e.target.value);
+        moistureValue.textContent = `${transactionsPaginationState.filters.moistureMin}-${transactionsPaginationState.filters.moistureMax}%`;
+        applyTransactionFilters();
+        transactionsPaginationState.currentPage = 1;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+    });
+    
+    // Quantity range sliders
+    const quantityMin = document.getElementById('transactions-quantity-min');
+    const quantityMax = document.getElementById('transactions-quantity-max');
+    const quantityValue = document.getElementById('quantity-value');
+    
+    quantityMin.addEventListener('input', (e) => {
+        if (parseInt(e.target.value) > parseInt(quantityMax.value)) {
+            quantityMax.value = e.target.value;
+        }
+        transactionsPaginationState.filters.quantityMin = parseInt(e.target.value);
+        quantityValue.textContent = `${transactionsPaginationState.filters.quantityMin}-${transactionsPaginationState.filters.quantityMax}`;
+        applyTransactionFilters();
+        transactionsPaginationState.currentPage = 1;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+    });
+    
+    quantityMax.addEventListener('input', (e) => {
+        if (parseInt(e.target.value) < parseInt(quantityMin.value)) {
+            quantityMin.value = e.target.value;
+        }
+        transactionsPaginationState.filters.quantityMax = parseInt(e.target.value);
+        quantityValue.textContent = `${transactionsPaginationState.filters.quantityMin}-${transactionsPaginationState.filters.quantityMax}`;
+        applyTransactionFilters();
+        transactionsPaginationState.currentPage = 1;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+    });
+    
+    // Clear filters button
+    document.getElementById('clear-filters-btn').addEventListener('click', () => {
+        transactionsPaginationState.filters = {
+            status: '',
+            paymentMethod: '',
+            searchTerm: '',
+            dateFrom: '',
+            dateTo: '',
+            moistureMin: 0,
+            moistureMax: 100,
+            quantityMin: 0,
+            quantityMax: 10000
+        };
+        document.getElementById('transactions-search-header').value = '';
+        renderTransactionFilters();
+        applyTransactionFilters();
+        transactionsPaginationState.currentPage = 1;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+    });
+}
+
+// Render transaction pagination (bottom pagination)
+function renderTransactionPagination() {
+    const container = document.getElementById('transactions-pagination-container');
+    if (!container) return;
+    
+    const totalItems = transactionsPaginationState.filteredData.length;
+    const itemsPerPage = transactionsPaginationState.itemsPerPage;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const currentPage = transactionsPaginationState.currentPage;
+    
+    // Generate page numbers to display (show up to 7 pages)
+    let pageNumbers = [];
+    if (totalPages <= 7) {
+        pageNumbers = Array.from({length: totalPages}, (_, i) => i + 1);
+    } else {
+        // Always show first page, last page, and pages around current page
+        pageNumbers = [1];
+        const startPage = Math.max(2, currentPage - 2);
+        const endPage = Math.min(totalPages - 1, currentPage + 2);
+        
+        if (startPage > 2) pageNumbers.push('...');
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(i);
+        }
+        if (endPage < totalPages - 1) pageNumbers.push('...');
+        pageNumbers.push(totalPages);
+    }
+    
+    const html = `
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-muted fw-semibold">Show</small>
+                <select class="form-select form-select-sm" id="transactions-per-page-bottom" style="width: auto;">
+                    <option value="10" ${itemsPerPage === 10 ? 'selected' : ''}>10</option>
+                    <option value="20" ${itemsPerPage === 20 ? 'selected' : ''}>20</option>
+                    <option value="50" ${itemsPerPage === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${itemsPerPage === 100 ? 'selected' : ''}>100</option>
+                </select>
+                <small class="text-muted fw-semibold">entries</small>
+            </div>
+            
+            <small class="text-muted">Showing ${totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, totalItems)} of ${totalItems} transactions</small>
+            
+            <nav aria-label="Transaction pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeTransactionPage(1); return false;" title="First Page">
+                            <i class="fas fa-step-backward"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeTransactionPage(${currentPage - 1}); return false;" title="Previous Page">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    ${pageNumbers.map(pageNum => {
+                        if (pageNum === '...') {
+                            return `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                        }
+                        return `<li class="page-item ${pageNum === currentPage ? 'active' : ''}">
+                            <a class="page-link" href="#" onclick="changeTransactionPage(${pageNum}); return false;">${pageNum}</a>
+                        </li>`;
+                    }).join('')}
+                    <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeTransactionPage(${currentPage + 1}); return false;" title="Next Page">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeTransactionPage(${totalPages}); return false;" title="Last Page">
+                            <i class="fas fa-step-forward"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    
+    // Attach event listener for items per page dropdown
+    const perPageSelect = document.getElementById('transactions-per-page-bottom');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', (e) => {
+            transactionsPaginationState.itemsPerPage = parseInt(e.target.value);
+            transactionsPaginationState.currentPage = 1;
+            renderTransactionPagination();
+            renderChainTransactionsTable();
+        });
+    }
+}
+
+// Change transaction page
+function changeTransactionPage(pageNum) {
+    const totalPages = Math.ceil(transactionsPaginationState.filteredData.length / transactionsPaginationState.itemsPerPage);
+    if (pageNum >= 1 && pageNum <= totalPages) {
+        transactionsPaginationState.currentPage = pageNum;
+        renderTransactionPagination();
+        renderChainTransactionsTable();
+        // Scroll to table
+        document.getElementById('transactions-tbody').scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
 // Show JSON Data Modal
@@ -1952,26 +2412,141 @@ function initializeApiTester() {
     updateUrl();
 }
 
-// Batch Tracker functionality
 async function loadBatchTracker() {
     try {
         showLoading(true);
         
-        // Load all batches for selection
-        const response = await fetch(`${API_BASE_URL}/rice-batches`);
+        // Load all batches from external API (optional for scanner)
+        const response = await fetch('https://digisaka.online/api/mobile/trace/batch/get-all');
         const data = await response.json();
         
-        if (data.success) {
+        if (data.success && data.data) {
             populateBatchList(data.data);
             setupBatchSearch(data.data);
         }
-        
-        showLoading(false);
     } catch (error) {
         console.error('Error loading batch tracker:', error);
         showToast('Error loading batch data', 'error');
+    } finally {
+        // Always set up QR scanner button, even if API fails
+        setupQRScanner();
         showLoading(false);
     }
+}
+
+// QR Scanner Setup - fullscreen overlay
+function setupQRScanner() {
+    const btn = document.getElementById('qr-scanner-toggle');
+    const overlay = document.getElementById('qr-overlay');
+    const video = document.getElementById('qr-video');
+    const closeBtn = document.getElementById('qr-close-btn');
+    const searchInput = document.getElementById('batch-search-input');
+
+    if (!btn || !overlay || !video || !closeBtn || !searchInput) return;
+
+    let stream = null;
+
+    async function openScanner() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' },
+                audio: false
+            });
+
+            video.srcObject = stream;
+            overlay.style.display = 'flex';
+
+            // Start scanning
+            scanQRCode(video, async (qrValue) => {
+                // Put QR text into input
+                searchInput.value = qrValue;
+
+                // Stop camera & hide overlay
+                if (stream) {
+                    stream.getTracks().forEach(t => t.stop());
+                    stream = null;
+                }
+                overlay.style.display = 'none';
+
+                // Call external batch API
+                try {
+                    const resp = await fetch(`https://digisaka.online/api/mobile/trace/batch/${encodeURIComponent(qrValue)}`);
+                    const data = await resp.json();
+                    console.log('Batch lookup result:', data);
+                    if (data && data.success) {
+                        showToast('Batch found', 'success');
+                        // You can plug this into your existing display logic here later
+                    } else {
+                        showToast('Batch not found', 'error');
+                    }
+                } catch (err) {
+                    console.error('Error fetching batch by QR:', err);
+                    showToast('Error fetching batch info', 'error');
+                }
+            });
+        } catch (err) {
+            console.error('Camera error:', err);
+            showToast('Camera error: ' + err.message, 'error');
+        }
+    }
+
+    function closeScanner() {
+        overlay.style.display = 'none';
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+            stream = null;
+        }
+    }
+
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openScanner();
+    });
+
+    closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeScanner();
+    });
+}
+
+// QR Code Scanning - generic
+function scanQRCode(video, onResult) {
+    if (typeof jsQR === 'undefined') {
+        console.error('jsQR not loaded');
+        showToast('QR library not loaded', 'error');
+        return;
+    }
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    let lastValue = null;
+
+    function loop() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            if (canvas.width && canvas.height) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code && code.data && code.data !== lastValue) {
+                    lastValue = code.data;
+                    onResult(code.data);
+                    return; // stop after first successful scan
+                }
+            }
+        }
+
+        // continue scanning while overlay is visible
+        const overlay = document.getElementById('qr-overlay');
+        if (overlay && overlay.style.display !== 'none') {
+            requestAnimationFrame(loop);
+        }
+    }
+
+    requestAnimationFrame(loop);
 }
 
 function populateBatchList(batches) {
@@ -1983,18 +2558,19 @@ function populateBatchList(batches) {
         listItem.href = '#';
         listItem.className = 'list-group-item list-group-item-action';
         listItem.dataset.batchId = batch.id;
+        listItem.dataset.qrCode = batch.qr_code;
         listItem.innerHTML = `
             <div class="d-flex w-100 justify-content-between">
-                <h6 class="mb-1">${batch.batch_number}</h6>
+                <h6 class="mb-1">${batch.qr_code ? batch.qr_code.substring(0, 8) + '...' : 'Batch ' + batch.id}</h6>
                 <small>${new Date(batch.created_at).toLocaleDateString()}</small>
             </div>
-            <p class="mb-1">${batch.rice_variety}</p>
-            <small>Farmer: ${batch.farmer_name || 'Unknown'}</small>
+            <p class="mb-1">Weight: ${batch.batch_weight_kg} kg</p>
+            <small>Status: ${batch.status || 'Unknown'}</small>
         `;
         
         listItem.addEventListener('click', (e) => {
             e.preventDefault();
-            selectBatch(batch.id);
+            selectBatch(batch.qr_code);
             
             // Update active state
             document.querySelectorAll('#batch-list .list-group-item').forEach(item => {
@@ -2013,32 +2589,27 @@ function setupBatchSearch(batches) {
     searchInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
         const filteredBatches = batches.filter(batch => 
-            batch.batch_number.toLowerCase().includes(searchTerm) ||
-            batch.rice_variety.toLowerCase().includes(searchTerm) ||
-            (batch.farmer_name && batch.farmer_name.toLowerCase().includes(searchTerm))
+            (batch.qr_code && batch.qr_code.toLowerCase().includes(searchTerm)) ||
+            (batch.batch_weight_kg && batch.batch_weight_kg.toString().includes(searchTerm)) ||
+            (batch.status && batch.status.toLowerCase().includes(searchTerm))
         );
         
         populateBatchList(filteredBatches);
     });
 }
 
-async function selectBatch(batchId) {
+async function selectBatch(qrCode) {
     try {
         showLoading(true);
         
-        // Fetch comprehensive batch data
-        const [batchResponse, millingResponse, transactionsResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/rice-batches/${batchId}`),
-            fetch(`${API_BASE_URL}/milled-rice?batch_id=${batchId}`),
-            fetch(`${API_BASE_URL}/transactions?batch_id=${batchId}`)
-        ]);
+        // Fetch batch data from external API using QR code
+        const response = await fetch(`https://digisaka.online/api/mobile/trace/batch/${qrCode}`);
+        const data = await response.json();
         
-        const batchData = await batchResponse.json();
-        const millingData = await millingResponse.json();
-        const transactionsData = await transactionsResponse.json();
-        
-        if (batchData.success) {
-            displayBatchDetails(batchData.data, millingData.data || [], transactionsData.data || []);
+        if (data.success && data.data) {
+            displayBatchDetails(data.data);
+        } else {
+            showToast('Batch not found', 'error');
         }
         
         showLoading(false);
@@ -2049,7 +2620,7 @@ async function selectBatch(batchId) {
     }
 }
 
-function displayBatchDetails(batch, millingData, transactions) {
+function displayBatchDetails(batch) {
     // Show batch details section and hide empty state
     document.getElementById('batch-details').style.display = 'block';
     document.getElementById('batch-empty-state').style.display = 'none';
@@ -2058,87 +2629,55 @@ function displayBatchDetails(batch, millingData, transactions) {
     const batchOverview = document.getElementById('batch-overview');
     batchOverview.innerHTML = `
         <div class="col-md-6">
-            <p><strong>Batch Number:</strong> ${batch.batch_number}</p>
-            <p><strong>Rice Variety:</strong> ${batch.rice_variety}</p>
-            <p><strong>Quality Grade:</strong> ${batch.quality_grade || 'N/A'}</p>
-            <p><strong>Quantity Harvested:</strong> ${batch.quantity_harvested || 'N/A'} kg</p>
+            <p><strong>QR Code:</strong> ${batch.qr_code || 'N/A'}</p>
+            <p><strong>Batch Weight:</strong> ${batch.batch_weight_kg || 'N/A'} kg</p>
+            <p><strong>Moisture Content:</strong> ${batch.moisture_content || 'N/A'}%</p>
+            <p><strong>Status:</strong> <span class="badge bg-${batch.status === 'for_sale' ? 'success' : 'warning'}">${batch.status || 'N/A'}</span></p>
         </div>
         <div class="col-md-6">
-            <p><strong>Planting Date:</strong> ${batch.planting_date ? new Date(batch.planting_date).toLocaleDateString() : 'N/A'}</p>
-            <p><strong>Harvest Date:</strong> ${batch.harvest_date ? new Date(batch.harvest_date).toLocaleDateString() : 'N/A'}</p>
-            <p><strong>Storage Conditions:</strong> ${batch.storage_conditions || 'N/A'}</p>
-            <p><strong>Certifications:</strong> ${batch.certifications || 'N/A'}</p>
+            <p><strong>Price per kg:</strong> ₱${batch.price_per_kg || 'N/A'}</p>
+            <p><strong>Current Holder ID:</strong> ${batch.current_holder_id || 'N/A'}</p>
+            <p><strong>Created:</strong> ${batch.created_at ? new Date(batch.created_at).toLocaleDateString() : 'N/A'}</p>
+            <p><strong>Updated:</strong> ${batch.updated_at ? new Date(batch.updated_at).toLocaleDateString() : 'N/A'}</p>
         </div>
     `;
     
-    // Populate farmer information
+    // Populate milling information
     const farmerInfo = document.getElementById('farmer-info');
     farmerInfo.innerHTML = `
         <div class="col-md-6">
-            <p><strong>Name:</strong> ${batch.farmer_name || 'N/A'}</p>
-            <p><strong>Contact:</strong> ${batch.farmer_contact || 'N/A'}</p>
+            <p><strong>Milling ID:</strong> ${batch.milling_id || 'N/A'}</p>
+            <p><strong>Drying ID:</strong> ${batch.drying_id || 'N/A'}</p>
         </div>
         <div class="col-md-6">
-            <p><strong>Location:</strong> ${batch.farmer_location || 'N/A'}</p>
-            <p><strong>Group:</strong> ${batch.farmer_group || 'N/A'}</p>
+            <p><strong>Season ID:</strong> ${batch.season_id || 'N/A'}</p>
+            <p><strong>Validator:</strong> ${batch.validator || 'Pending'}</p>
         </div>
     `;
     
     // Populate season information
     const seasonInfo = document.getElementById('season-info');
     seasonInfo.innerHTML = `
-        <div class="col-md-6">
-            <p><strong>Season Name:</strong> ${batch.season_name || 'N/A'}</p>
-            <p><strong>Planting Date:</strong> ${batch.season_planting_date ? new Date(batch.season_planting_date).toLocaleDateString() : 'N/A'}</p>
-        </div>
-        <div class="col-md-6">
-            <p><strong>Harvesting Date:</strong> ${batch.season_harvesting_date ? new Date(batch.season_harvesting_date).toLocaleDateString() : 'N/A'}</p>
-            <p><strong>Variety:</strong> ${batch.season_variety || 'N/A'}</p>
+        <div class="col-md-12">
+            <p class="text-muted"><i class="fas fa-info-circle me-2"></i>Additional batch information is available in the batch details above.</p>
         </div>
     `;
     
-    // Populate milling data (only show the first/latest milling record)
+    // Hide milling data section (not available from this API)
     const millingDataDiv = document.getElementById('milling-data');
-    if (millingData && millingData.length > 0) {
-        const milling = millingData[0]; // Show only the first milling record
-        millingDataDiv.innerHTML = `
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>Milling Date:</strong> ${new Date(milling.milling_date).toLocaleDateString()}</p>
-                    <p><strong>Miller:</strong> ${milling.miller_name || 'N/A'}</p>
-                    <p><strong>Input Quantity:</strong> ${milling.input_quantity} kg</p>
-                    <p><strong>Machine:</strong> ${milling.machine || 'N/A'}</p>
-                </div>
-                <div class="col-md-6">
-                    <p><strong>Output Quantity:</strong> ${milling.output_quantity} kg</p>
-                    <p><strong>Yield:</strong> ${((milling.output_quantity / milling.input_quantity) * 100).toFixed(1)}%</p>
-                    <p><strong>Quality:</strong> ${milling.quality || 'N/A'}</p>
-                    <p><strong>Notes:</strong> ${milling.notes || 'N/A'}</p>
-                </div>
-            </div>
-        `;
-    } else {
-        millingDataDiv.innerHTML = '<p class="text-muted">No milling data available for this batch.</p>';
-    }
+    millingDataDiv.innerHTML = '<p class="text-muted">Milling data not available in current API response.</p>';
     
-    // Populate transaction history
+    // Hide transaction history section (not available from this API)
     const transactionsTbody = document.getElementById('batch-transactions-tbody');
-    if (transactions && transactions.length > 0) {
-        transactionsTbody.innerHTML = transactions.map(transaction => `
-            <tr>
-                <td>${new Date(transaction.transaction_date).toLocaleDateString()}</td>
-                <td><span class="badge bg-info">${transaction.transaction_type}</span></td>
-                <td>${transaction.from_actor_name || 'N/A'}</td>
-                <td>${transaction.to_actor_name || 'N/A'}</td>
-                <td>₱${transaction.total_amount || '0.00'}</td>
-                <td><span class="badge bg-${transaction.status === 'completed' ? 'success' : 'warning'}">${transaction.status}</span></td>
-            </tr>
-        `).join('');
-    } else {
-        transactionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No transactions found for this batch.</td></tr>';
-    }
+    transactionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Transaction history not available in current API response.</td></tr>';
 }
 
+
+// Function to view season details
+function viewSeasonDetails(seasonId) {
+    showToast('Season details for ID: ' + seasonId, 'info');
+    // This can be expanded to show a modal with detailed season information
+}
 
 // Function to show actor information modal
 async function showActorInfo(actorId) {
