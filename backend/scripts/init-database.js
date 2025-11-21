@@ -127,6 +127,9 @@ async function initializeDatabase() {
                 payment_reference TEXT, -- JSON array of payment references
                 transaction_date VARCHAR(255) NOT NULL,
                 status VARCHAR(50) NOT NULL,
+                quality INTEGER,
+                moisture VARCHAR(50),
+                is_test INTEGER DEFAULT 0,
                 notes TEXT,
                 blockchain_public_key VARCHAR(255), -- Solana public key
                 blockchain_signature VARCHAR(255), -- Transaction signature

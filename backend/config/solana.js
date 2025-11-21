@@ -7,7 +7,7 @@ const path = require('path');
 // Solana configuration
 const SOLANA_CONFIG = {
     network: process.env.SOLANA_NETWORK || 'devnet',
-    programId: process.env.PROGRAM_ID || 'FS1fWouL7tpGRTErvRcdcWpgU2BsSuTfbEpEDBufWF1N',
+    programId: process.env.PROGRAM_ID || 'ricekHKquRsgSvPzvsqJL826KbqW9vFXnLsxJv5F8T9',
     commitment: 'confirmed'
 };
 
@@ -286,6 +286,95 @@ class SolanaService {
         }
     }
 
+    async getTransactionSignature(publicKey) {
+        try {
+            const signatures = await this.connection.getSignaturesForAddress(new PublicKey(publicKey), { limit: 1 });
+            if (signatures && signatures.length > 0) {
+                return signatures[0].signature;
+            }
+            return null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    async getMemoDataForTransaction(publicKey) {
+        try {
+            // Get all transactions for this account to find the memo
+            const signatures = await this.connection.getSignaturesForAddress(new PublicKey(publicKey), { limit: 1 });
+            
+            if (!signatures || signatures.length === 0) {
+                console.log(`No signatures found for ${publicKey}`);
+                return null;
+            }
+            
+            // Get the most recent transaction
+            const txSignature = signatures[0].signature;
+            console.log(`Fetching transaction ${txSignature} for ${publicKey}`);
+            
+            const transaction = await this.connection.getTransaction(txSignature, {
+                maxSupportedTransactionVersion: 0
+            });
+            
+            if (!transaction || !transaction.transaction.message.instructions) {
+                console.log(`No transaction or instructions found for ${txSignature}`);
+                return null;
+            }
+            
+            // Find the memo instruction
+            const MEMO_PROGRAM_ID = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
+            console.log(`Looking for memo in ${transaction.transaction.message.instructions.length} instructions`);
+            
+            const accountKeys = transaction.transaction.message.accountKeys;
+            
+            for (const instruction of transaction.transaction.message.instructions) {
+                // Handle both parsed and unparsed instruction formats
+                let programId = null;
+                if (instruction.programId) {
+                    programId = instruction.programId.toString ? instruction.programId.toString() : instruction.programId;
+                } else if (instruction.program) {
+                    programId = instruction.program;
+                } else if (instruction.programIdIndex !== undefined && accountKeys) {
+                    // Unparsed format - look up program ID from account keys
+                    const programAccount = accountKeys[instruction.programIdIndex];
+                    programId = programAccount.toString ? programAccount.toString() : programAccount;
+                }
+                
+                console.log(`Instruction program: ${programId}`);
+                if (programId === MEMO_PROGRAM_ID) {
+                    // The memo data is in the instruction data
+                    let memoData = instruction.data;
+                    console.log(`Raw memo data type: ${typeof memoData}`);
+                    
+                    if (typeof memoData === 'string') {
+                        // Data is base64 encoded string from RPC
+                        memoData = Buffer.from(memoData, 'base64');
+                    } else if (Array.isArray(memoData)) {
+                        memoData = Buffer.from(memoData);
+                    }
+                    
+                    const memoText = memoData.toString('utf8');
+                    console.log(`Found memo data (first 200 chars): ${memoText.substring(0, 200)}`);
+                    
+                    // Try to parse as JSON
+                    try {
+                        return JSON.parse(memoText);
+                    } catch (parseErr) {
+                        console.log(`Failed to parse memo JSON: ${parseErr.message}`);
+                        // The memo data might not be JSON, which is fine
+                        return null;
+                    }
+                }
+            }
+            
+            console.log(`No memo instruction found for ${publicKey}`);
+            return null;
+        } catch (error) {
+            console.error(`Error fetching memo for ${publicKey}:`, error.message);
+            return null;
+        }
+    }
+
     async getAllTransactions() {
         try {
             // Get all accounts owned by our program
@@ -299,16 +388,30 @@ class SolanaService {
                     // Try to decode the account data
                     const decoded = this.decodeTransactionAccount(account.account.data);
                     if (decoded && decoded.from_actor_id !== undefined) {
-                        // Use the timestamp from the account as the signature (no extra RPC call)
-                        // This avoids rate limiting issues
-                        transactions.push({
-                            publicKey: account.pubkey.toString(),
-                            signature: account.pubkey.toString(), // Use pubkey as fallback signature
+                        const publicKeyStr = account.pubkey.toString();
+                        
+                        // Fetch the actual transaction signature
+                        let signature = publicKeyStr;
+                        try {
+                            const actualSignature = await this.getTransactionSignature(publicKeyStr);
+                            if (actualSignature) {
+                                signature = actualSignature;
+                            }
+                        } catch (sigErr) {
+                            // Use publicKey as fallback
+                        }
+                        
+                        // Use decoded on-chain data directly
+                        const transactionData = {
+                            publicKey: publicKeyStr,
+                            signature: signature,
                             ...decoded,
                             blockchain_verified: true,
                             lamports: account.account.lamports,
                             owner: account.account.owner.toString()
-                        });
+                        };
+                        
+                        transactions.push(transactionData);
                     } else {
                         // Silently skip invalid accounts to reduce log noise
                     }
@@ -325,7 +428,7 @@ class SolanaService {
         }
     }
 
-    async getTransactionsByPublicKey(publicKey) {
+    async getTransactionsByPublicKey(publicKey, includeMemo = false) {
         try {
             const pubkey = new PublicKey(publicKey);
             const accountInfo = await this.connection.getAccountInfo(pubkey);
@@ -335,7 +438,29 @@ class SolanaService {
             }
             
             const decoded = this.decodeTransactionAccount(accountInfo.data);
-            return decoded ? { publicKey: publicKey, ...decoded } : null;
+            if (!decoded) return null;
+            
+            const transactionData = { publicKey: publicKey, ...decoded };
+            
+            // Optionally fetch memo data if requested
+            if (includeMemo) {
+                try {
+                    const memoData = await this.getMemoDataForTransaction(publicKey);
+                    if (memoData) {
+                        transactionData.batch_ids = memoData.batch_ids || decoded.batch_ids;
+                        transactionData.status = memoData.status || decoded.status;
+                        transactionData.quality = memoData.quality !== undefined ? memoData.quality : decoded.quality;
+                        transactionData.moisture = memoData.moisture || null;
+                        transactionData.transaction_date = memoData.transaction_date || null;
+                        transactionData.is_test = memoData.is_test !== undefined ? memoData.is_test : decoded.is_test;
+                        transactionData.json_data = JSON.stringify(memoData);
+                    }
+                } catch (memoErr) {
+                    // Continue without memo data
+                }
+            }
+            
+            return transactionData;
         } catch (error) {
             console.error('Error fetching transaction by public key:', error);
             throw error;
@@ -400,6 +525,20 @@ class SolanaService {
             const transaction_count = Number(data.readBigUInt64LE(offset));
             offset += 8;
             
+            // Convert timestamp to ISO date string
+            // Timestamp is in seconds, convert to milliseconds
+            let transaction_date = null;
+            if (timestamp && timestamp > 0 && timestamp < 9999999999) {
+                try {
+                    const dateObj = new Date(timestamp * 1000);
+                    if (!isNaN(dateObj.getTime())) {
+                        transaction_date = dateObj.toISOString();
+                    }
+                } catch (e) {
+                    // Invalid timestamp, leave as null
+                }
+            }
+            
             // Return decoded transaction data
             return {
                 from_actor_id,
@@ -416,6 +555,9 @@ class SolanaService {
                 batch_ids: [],
                 status: 'completed',
                 is_test: 0,
+                moisture: null,
+                quality: null,
+                transaction_date: transaction_date,
                 data_format: 'binary' // Mark as binary format (on-chain only)
             };
         } catch (error) {

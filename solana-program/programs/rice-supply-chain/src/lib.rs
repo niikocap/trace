@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("FS1fWouL7tpGRTErvRcdcWpgU2BsSuTfbEpEDBufWF1N");
+declare_id!("ricekHKquRsgSvPzvsqJL826KbqW9vFXnLsxJv5F8T9");
 
 #[program]
 pub mod rice_supply_chain {

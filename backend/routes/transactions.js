@@ -1,20 +1,43 @@
 const express = require('express');
 const router = express.Router();
 const solanaService = require('../config/solana');
+const database = require('../config/database');
+const transactionCache = require('../config/transaction-cache');
 const { Connection, PublicKey, Keypair, SystemProgram, Transaction } = require('@solana/web3.js');
 const { AnchorProvider, Program, web3 } = require('@coral-xyz/anchor');
 
 // Initialize Solana service
 solanaService.initialize();
 
-// GET /api/transactions - Get all transactions from blockchain
+// GET /api/transactions - Get all transactions from blockchain with cache
 router.get('/', async (req, res) => {
     try {
-        const transactions = await solanaService.getAllTransactions();
+        const blockchainTransactions = await solanaService.getAllTransactions();
+        
+        // Get cached metadata
+        const cachedData = transactionCache.getAll();
+        
+        // Merge blockchain and cached data
+        const enrichedTransactions = blockchainTransactions.map(tx => {
+            const cached = cachedData[tx.publicKey];
+            if (cached) {
+                return {
+                    ...tx,
+                    batch_ids: cached.batch_ids || tx.batch_ids,
+                    moisture: cached.moisture || tx.moisture,
+                    quality: cached.quality !== undefined ? cached.quality : tx.quality,
+                    status: cached.status || tx.status,
+                    transaction_date: cached.transaction_date || tx.transaction_date,
+                    is_test: cached.is_test !== undefined ? cached.is_test : tx.is_test
+                };
+            }
+            return tx;
+        });
+        
         res.json({
             success: true,
-            data: transactions,
-            count: transactions.length
+            data: enrichedTransactions,
+            count: enrichedTransactions.length
         });
     } catch (error) {
         console.error('Error fetching transactions:', error);
@@ -72,6 +95,7 @@ router.post('/sample', async (req, res) => {
 router.get('/pubkey/:publicKey', async (req, res) => {
     try {
         const { publicKey } = req.params;
+        const { includeMemo } = req.query;
         
         // Validate public key format
         try {
@@ -83,7 +107,7 @@ router.get('/pubkey/:publicKey', async (req, res) => {
             });
         }
         
-        const transaction = await solanaService.getTransactionsByPublicKey(publicKey);
+        const transaction = await solanaService.getTransactionsByPublicKey(publicKey, includeMemo === 'true');
         
         if (!transaction) {
             return res.status(404).json({
@@ -160,6 +184,43 @@ router.post('/', async (req, res) => {
         
         // Create real blockchain transaction
         const result = await solanaService.createRealTransaction(transactionData);
+        
+        // Cache transaction metadata
+        transactionCache.store(result.publicKey, {
+            batch_ids: transactionData.batch_ids,
+            moisture: transactionData.moisture,
+            quality: transactionData.quality,
+            status: transactionData.status,
+            transaction_date: transactionData.transaction_date,
+            is_test: transactionData.is_test,
+            from_actor_id: transactionData.from_actor_id,
+            to_actor_id: transactionData.to_actor_id
+        });
+        
+        // Also try to store in database if available
+        try {
+            const transactionId = `TXN-${Date.now()}`;
+            await database.insert('transactions', {
+                transaction_id: transactionId,
+                transaction_type: 'sale',
+                from_actor_id: transactionData.from_actor_id,
+                to_actor_id: transactionData.to_actor_id,
+                batch_ids: JSON.stringify(transactionData.batch_ids),
+                quantity: transactionData.quantity,
+                unit_price: transactionData.unit_price,
+                transaction_date: transactionData.transaction_date,
+                status: transactionData.status,
+                quality: transactionData.quality,
+                moisture: transactionData.moisture,
+                is_test: transactionData.is_test,
+                blockchain_public_key: result.publicKey,
+                blockchain_signature: result.signature,
+                blockchain_verified: true
+            });
+        } catch (dbError) {
+            console.error('Error storing transaction in database:', dbError);
+            // Continue - cache is already saved
+        }
         
         res.status(201).json({
             success: true,

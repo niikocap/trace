@@ -1,0 +1,54 @@
+{
+  "49dBACWfnTLghQNe4KqVHMtiZ7N8rmt4EirSGRaJkjuc": {
+    "batch_ids": [
+      100
+    ],
+    "moisture": "12.5",
+    "quality": 95,
+    "status": "completed",
+    "transaction_date": "2025-11-21T08:00:19.905Z",
+    "is_test": 1,
+    "from_actor_id": 1,
+    "to_actor_id": 2,
+    "cached_at": "2025-11-21T08:00:22.428Z"
+  },
+  "WL2iVpzv1D94PtaRM7HofXfRcGnXyEr2SoKC7bnV1R5": {
+    "batch_ids": [
+      20
+    ],
+    "moisture": "13.2",
+    "quality": 88,
+    "status": "completed",
+    "transaction_date": "2025-11-21T07:45:55.000Z",
+    "is_test": 1,
+    "from_actor_id": 2,
+    "to_actor_id": 3,
+    "cached_at": "2025-11-21T08:05:30.062Z"
+  },
+  "8SYSLF3yyc9fwSMpUtmCb8hGCufHFCdesQCUv79mxdsh": {
+    "batch_ids": [
+      30
+    ],
+    "moisture": "11.8",
+    "quality": 92,
+    "status": "completed",
+    "transaction_date": "2025-11-21T07:47:14.000Z",
+    "is_test": 1,
+    "from_actor_id": 3,
+    "to_actor_id": 4,
+    "cached_at": "2025-11-21T08:05:30.063Z"
+  },
+  "FQKhURG4nKZeNimpcbhA4jFRKCKeWzPr9RW2sJUjMZov": {
+    "batch_ids": [
+      10
+    ],
+    "moisture": "12.5",
+    "quality": 95,
+    "status": "completed",
+    "transaction_date": "2025-11-21T07:45:28.000Z",
+    "is_test": 1,
+    "from_actor_id": 1,
+    "to_actor_id": 2,
+    "cached_at": "2025-11-21T08:05:30.063Z"
+  }
+}
