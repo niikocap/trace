@@ -791,16 +791,9 @@ function renderChainTransactionsTable() {
             batchDisplay = transaction.batch_ids.join(', ');
         }
         
-        // Create actor links
-        const fromActorLink = transaction.from_actor_name ? 
-            `<a href="#" class="text-primary text-decoration-none" onclick="showActorInfo(${transaction.from_actor_id})">
-                <i class="fas fa-user me-1"></i>${transaction.from_actor_name}
-            </a>` : (transaction.from_actor_id || '-');
-            
-        const toActorLink = transaction.to_actor_name ? 
-            `<a href="#" class="text-primary text-decoration-none" onclick="showActorInfo(${transaction.to_actor_id})">
-                <i class="fas fa-user me-1"></i>${transaction.to_actor_name}
-            </a>` : (transaction.to_actor_id || '-');
+        // Show real actor IDs (not parsed names)
+        const fromActorDisplay = transaction.from_actor_id || '-';
+        const toActorDisplay = transaction.to_actor_id || '-';
         
         // Format payment reference
         let paymentRef = 'Cash';
@@ -820,16 +813,23 @@ function renderChainTransactionsTable() {
             </button>` : 
             `<span class="badge bg-warning">Binary</span>`;
 
+        // Convert status number to readable string
+        let statusDisplay = transaction.status;
+        if (typeof transaction.status === 'number') {
+            const statusMap = { 0: 'Cancelled', 1: 'Completed', 2: 'Pending' };
+            statusDisplay = statusMap[transaction.status] || 'Unknown';
+        }
+        
         row.innerHTML = `
             <td>${batchDisplay}</td>
-            <td>${fromActorLink}</td>
-            <td>${toActorLink}</td>
+            <td>${fromActorDisplay}</td>
+            <td>${toActorDisplay}</td>
             <td>${transaction.quantity || '-'}</td>
             <td>₱${(parseFloat(transaction.quantity || 0) * parseFloat(transaction.unit_price || 0)).toFixed(2)}</td>
             <td><span class="badge bg-secondary">${paymentRef}</span></td>
             <td>${moistureDisplay}</td>
             <td>${formatDate(transaction.transaction_date)}</td>
-            <td><span class="badge ${getStatusBadgeClass(transaction.status)}">${transaction.status}</span></td>
+            <td><span class="badge ${getStatusBadgeClass(transaction.status)}">${statusDisplay}</span></td>
             <td>${jsonDataDisplay}</td>
             <td>
                 ${transaction.signature ? `<a href="https://explorer.solana.com/tx/${transaction.signature}?cluster=devnet" target="_blank" class="btn btn-sm btn-outline-primary" title="View on Solana Explorer">
@@ -1840,17 +1840,6 @@ function formatDate(dateString) {
     return date.toLocaleDateString();
 }
 
-function getStatusBadgeClass(status) {
-    const classes = {
-        'active': 'bg-success',
-        'inactive': 'bg-secondary',
-        'pending': 'bg-warning',
-        'completed': 'bg-success',
-        'cancelled': 'bg-danger'
-    };
-    return classes[status] || 'bg-secondary';
-}
-
 function filterTable(searchTerm, tableType) {
     const tableId = `${tableType}-table`;
     const table = document.getElementById(tableId);
@@ -2846,7 +2835,15 @@ function filterTable(searchTerm, tableType) {
 
 // Get status badge class helper
 function getStatusBadgeClass(status) {
-    switch(status?.toLowerCase()) {
+    // Handle both number (0, 1, 2) and string formats
+    let statusStr = status;
+    if (typeof status === 'number') {
+        // 0=cancelled, 1=completed, 2=pending
+        const statusMap = { 0: 'cancelled', 1: 'completed', 2: 'pending' };
+        statusStr = statusMap[status] || 'unknown';
+    }
+    
+    switch(statusStr?.toLowerCase()) {
         case 'completed': return 'bg-success';
         case 'pending': return 'bg-warning';
         case 'cancelled': return 'bg-danger';

@@ -9,35 +9,16 @@ const { AnchorProvider, Program, web3 } = require('@coral-xyz/anchor');
 // Initialize Solana service
 solanaService.initialize();
 
-// GET /api/transactions - Get all transactions from blockchain with cache
+// GET /api/transactions - Get all transactions from blockchain (NO MEMO, NO CACHE)
 router.get('/', async (req, res) => {
     try {
         const blockchainTransactions = await solanaService.getAllTransactions();
         
-        // Get cached metadata
-        const cachedData = transactionCache.getAll();
-        
-        // Merge blockchain and cached data
-        const enrichedTransactions = blockchainTransactions.map(tx => {
-            const cached = cachedData[tx.publicKey];
-            if (cached) {
-                return {
-                    ...tx,
-                    batch_ids: cached.batch_ids || tx.batch_ids,
-                    moisture: cached.moisture || tx.moisture,
-                    quality: cached.quality !== undefined ? cached.quality : tx.quality,
-                    status: cached.status || tx.status,
-                    transaction_date: cached.transaction_date || tx.transaction_date,
-                    is_test: cached.is_test !== undefined ? cached.is_test : tx.is_test
-                };
-            }
-            return tx;
-        });
-        
+        // Show all transactions (no filter)
         res.json({
             success: true,
-            data: enrichedTransactions,
-            count: enrichedTransactions.length
+            data: blockchainTransactions,
+            count: blockchainTransactions.length
         });
     } catch (error) {
         console.error('Error fetching transactions:', error);
@@ -130,19 +111,19 @@ router.get('/pubkey/:publicKey', async (req, res) => {
     }
 });
 
-// POST /api/transactions - Create new transaction on blockchain
+// POST /api/transactions - Create new transaction on blockchain (NO CACHE)
 router.post('/', async (req, res) => {
     try {
         const {
             from_actor_id,
             to_actor_id,
+            batch_ids,
             batch_id,
             quantity,
             price_per_kg,
             total_amount,
             payment_reference,
             status,
-            quality,
             moisture,
             is_test,
             nonce
@@ -166,18 +147,45 @@ router.post('/', async (req, res) => {
             }
         }
         
+        // Handle batch_ids - accept array or single ID
+        let batchIdsArray = [];
+        if (batch_ids) {
+            // If batch_ids is provided as array
+            batchIdsArray = Array.isArray(batch_ids) 
+                ? batch_ids.map(id => parseInt(id))
+                : [parseInt(batch_ids)];
+        } else if (batch_id) {
+            // Fallback to single batch_id
+            batchIdsArray = [parseInt(batch_id)];
+        }
+        
+        // Handle moisture as decimal number (string)
+        const moistureValue = moisture ? String(moisture) : null;
+        
+        // Convert status string to number (0=cancelled, 1=completed, 2=pending)
+        let statusValue = 1; // default to completed
+        if (status) {
+            if (status === 'cancelled' || status === '0') {
+                statusValue = 0;
+            } else if (status === 'completed' || status === '1') {
+                statusValue = 1;
+            } else if (status === 'pending' || status === '2') {
+                statusValue = 2;
+            }
+        }
+        
         // Create real blockchain transaction
         const transactionData = {
             from_actor_id: parseInt(from_actor_id),
             to_actor_id: parseInt(to_actor_id),
-            batch_ids: batch_id ? [parseInt(batch_id)] : [],
+            batch_ids: batchIdsArray,
+            batch_id: batchIdsArray.length > 0 ? batchIdsArray[0] : 0,
             quantity: quantity || '0',
             unit_price: price_per_kg || '0.00',
             payment_reference: paymentRefValue,
             transaction_date: new Date().toISOString(),
-            status: status || 'completed',
-            quality: quality !== undefined ? parseInt(quality) : null,
-            moisture: moisture || null,
+            status: statusValue,
+            moisture: parseInt(moisture || '0'),
             is_test: is_test !== undefined ? Number(is_test) : 1,
             nonce: nonce !== undefined ? nonce : 0
         };
@@ -185,42 +193,7 @@ router.post('/', async (req, res) => {
         // Create real blockchain transaction
         const result = await solanaService.createRealTransaction(transactionData);
         
-        // Cache transaction metadata
-        transactionCache.store(result.publicKey, {
-            batch_ids: transactionData.batch_ids,
-            moisture: transactionData.moisture,
-            quality: transactionData.quality,
-            status: transactionData.status,
-            transaction_date: transactionData.transaction_date,
-            is_test: transactionData.is_test,
-            from_actor_id: transactionData.from_actor_id,
-            to_actor_id: transactionData.to_actor_id
-        });
-        
-        // Also try to store in database if available
-        try {
-            const transactionId = `TXN-${Date.now()}`;
-            await database.insert('transactions', {
-                transaction_id: transactionId,
-                transaction_type: 'sale',
-                from_actor_id: transactionData.from_actor_id,
-                to_actor_id: transactionData.to_actor_id,
-                batch_ids: JSON.stringify(transactionData.batch_ids),
-                quantity: transactionData.quantity,
-                unit_price: transactionData.unit_price,
-                transaction_date: transactionData.transaction_date,
-                status: transactionData.status,
-                quality: transactionData.quality,
-                moisture: transactionData.moisture,
-                is_test: transactionData.is_test,
-                blockchain_public_key: result.publicKey,
-                blockchain_signature: result.signature,
-                blockchain_verified: true
-            });
-        } catch (dbError) {
-            console.error('Error storing transaction in database:', dbError);
-            // Continue - cache is already saved
-        }
+        // NO CACHE - Data comes from blockchain only
         
         res.status(201).json({
             success: true,

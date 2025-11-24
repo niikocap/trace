@@ -1,5 +1,5 @@
 {
-  "address": "6NcVSFj9gGYtSDWz1EPxY9BM2QZRrZ49fpadK6bACTgk",
+  "address": "AvgeUvuXvYdhsbL2AF3c818y3UfTXcjwceXRr6tA4ba1",
   "metadata": {
     "name": "rice_supply_chain",
     "version": "0.1.0",
@@ -48,6 +48,22 @@
         },
         {
           "name": "payment_reference",
+          "type": "u8"
+        },
+        {
+          "name": "batch_id",
+          "type": "u64"
+        },
+        {
+          "name": "moisture",
+          "type": "u64"
+        },
+        {
+          "name": "status",
+          "type": "u8"
+        },
+        {
+          "name": "is_test",
           "type": "u8"
         }
       ]
@@ -102,6 +118,22 @@
         },
         {
           "name": "nonce",
+          "type": "u8"
+        },
+        {
+          "name": "batch_id",
+          "type": "u64"
+        },
+        {
+          "name": "moisture",
+          "type": "u64"
+        },
+        {
+          "name": "status",
+          "type": "u8"
+        },
+        {
+          "name": "is_test",
           "type": "u8"
         }
       ]
@@ -218,6 +250,22 @@
           {
             "name": "transaction_count",
             "type": "u64"
+          },
+          {
+            "name": "batch_id",
+            "type": "u64"
+          },
+          {
+            "name": "moisture",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "is_test",
+            "type": "u8"
           }
         ]
       }

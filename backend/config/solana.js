@@ -7,7 +7,7 @@ const path = require('path');
 // Solana configuration
 const SOLANA_CONFIG = {
     network: process.env.SOLANA_NETWORK || 'devnet',
-    programId: process.env.PROGRAM_ID || '6NcVSFj9gGYtSDWz1EPxY9BM2QZRrZ49fpadK6bACTgk',
+    programId: process.env.PROGRAM_ID || 'AvgeUvuXvYdhsbL2AF3c818y3UfTXcjwceXRr6tA4ba1',
     commitment: 'confirmed'
 };
 
@@ -163,14 +163,17 @@ class SolanaService {
             let instructionData = Buffer.alloc(0);
             instructionData = Buffer.concat([instructionData, discriminator]);
             
-            // Serialize arguments in order: from_actor_id, to_actor_id, quantity, unit_price, payment_reference, nonce
-            // NOTE: data_hash is now computed in backend and returned, not sent to blockchain
+            // Serialize arguments in order: from_actor_id, to_actor_id, quantity, unit_price, payment_reference, nonce, batch_id, moisture, status, is_test
             instructionData = Buffer.concat([instructionData, this.serializeU64(transactionData.from_actor_id)]);
             instructionData = Buffer.concat([instructionData, this.serializeU64(transactionData.to_actor_id)]);
             instructionData = Buffer.concat([instructionData, this.serializeU64(parseInt(transactionData.quantity || '0'))]);
             instructionData = Buffer.concat([instructionData, this.serializeU64(parseInt(transactionData.unit_price || '0'))]);
             instructionData = Buffer.concat([instructionData, this.serializeU8(transactionData.payment_reference)]);
             instructionData = Buffer.concat([instructionData, this.serializeU8(nonce)]);
+            instructionData = Buffer.concat([instructionData, this.serializeU64(transactionData.batch_id || 0)]);
+            instructionData = Buffer.concat([instructionData, this.serializeU64(transactionData.moisture || 0)]);
+            instructionData = Buffer.concat([instructionData, this.serializeU8(transactionData.status || 0)]);
+            instructionData = Buffer.concat([instructionData, this.serializeU8(transactionData.is_test || 0)]);
 
             // Create instruction
             const ix = new TransactionInstruction({
@@ -392,13 +395,13 @@ class SolanaService {
             });
             
             if (!signatures || signatures.length === 0) {
-                console.log(`No signatures found for ${publicKey}`);
+                console.log(`[MEMO] No signatures found for ${publicKey}`);
                 return null;
             }
             
             // Get the most recent transaction
             const txSignature = signatures[0].signature;
-            console.log(`Fetching transaction ${txSignature} for ${publicKey}`);
+            console.log(`[MEMO] Fetching transaction ${txSignature} for ${publicKey}`);
             
             const transaction = await this.queueRequest(async () => {
                 return await this.connection.getTransaction(txSignature, {
@@ -407,13 +410,13 @@ class SolanaService {
             });
             
             if (!transaction || !transaction.transaction.message.instructions) {
-                console.log(`No transaction or instructions found for ${txSignature}`);
+                console.log(`[MEMO] No transaction or instructions found for ${txSignature}`);
                 return null;
             }
             
             // Find the memo instruction
             const MEMO_PROGRAM_ID = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
-            console.log(`Looking for memo in ${transaction.transaction.message.instructions.length} instructions`);
+            console.log(`[MEMO] Looking for memo in ${transaction.transaction.message.instructions.length} instructions`);
             
             const accountKeys = transaction.transaction.message.accountKeys;
             
@@ -430,37 +433,48 @@ class SolanaService {
                     programId = programAccount.toString ? programAccount.toString() : programAccount;
                 }
                 
-                console.log(`Instruction program: ${programId}`);
+                console.log(`[MEMO] Instruction program: ${programId}`);
                 if (programId === MEMO_PROGRAM_ID) {
                     // The memo data is in the instruction data
                     let memoData = instruction.data;
-                    console.log(`Raw memo data type: ${typeof memoData}`);
+                    console.log(`[MEMO] Raw memo data type: ${typeof memoData}`);
                     
+                    let memoText = '';
                     if (typeof memoData === 'string') {
-                        // Data is base64 encoded string from RPC
-                        memoData = Buffer.from(memoData, 'base64');
+                        // Data is base64 encoded string from RPC - decode it
+                        try {
+                            const buffer = Buffer.from(memoData, 'base64');
+                            memoText = buffer.toString('utf8');
+                        } catch (e) {
+                            console.log(`[MEMO] Failed to decode base64: ${e.message}`);
+                            continue;
+                        }
                     } else if (Array.isArray(memoData)) {
-                        memoData = Buffer.from(memoData);
+                        memoText = Buffer.from(memoData).toString('utf8');
+                    } else if (Buffer.isBuffer(memoData)) {
+                        memoText = memoData.toString('utf8');
                     }
                     
-                    const memoText = memoData.toString('utf8');
-                    console.log(`Found memo data (first 200 chars): ${memoText.substring(0, 200)}`);
+                    console.log(`[MEMO] Decoded memo text (first 200 chars): ${memoText.substring(0, 200)}`);
                     
                     // Try to parse as JSON
                     try {
-                        return JSON.parse(memoText);
+                        const parsed = JSON.parse(memoText);
+                        console.log(`[MEMO] Successfully parsed memo JSON`);
+                        return parsed;
                     } catch (parseErr) {
-                        console.log(`Failed to parse memo JSON: ${parseErr.message}`);
+                        console.log(`[MEMO] Failed to parse memo JSON: ${parseErr.message}`);
+                        console.log(`[MEMO] Raw memo text: ${memoText}`);
                         // The memo data might not be JSON, which is fine
                         return null;
                     }
                 }
             }
             
-            console.log(`No memo instruction found for ${publicKey}`);
+            console.log(`[MEMO] No memo instruction found for ${publicKey}`);
             return null;
         } catch (error) {
-            console.error(`Error fetching memo for ${publicKey}:`, error.message);
+            console.error(`[MEMO] Error fetching memo for ${publicKey}:`, error.message);
             return null;
         }
     }
@@ -570,7 +584,7 @@ class SolanaService {
                 return null;
             }
             
-            // TransactionAccount structure (56 bytes total):
+            // TransactionAccount structure:
             // Discriminator: 8 bytes (skipped by Anchor)
             // from_actor_id: u64 (8 bytes)
             // to_actor_id: u64 (8 bytes)
@@ -581,6 +595,10 @@ class SolanaService {
             // bump: u8 (1 byte)
             // nonce: u8 (1 byte)
             // transaction_count: u64 (8 bytes)
+            // batch_id: u64 (8 bytes)
+            // moisture: u64 (8 bytes)
+            // status: u8 (1 byte)
+            // is_test: u8 (1 byte)
             
             let offset = 8; // Skip discriminator
             
@@ -621,8 +639,32 @@ class SolanaService {
             const transaction_count = Number(data.readBigUInt64LE(offset));
             offset += 8;
             
+            // Read new fields (batch_id, moisture, status, is_test)
+            let batch_id = 0;
+            if (offset + 8 <= data.length) {
+                batch_id = Number(data.readBigUInt64LE(offset));
+                offset += 8;
+            }
+            
+            let moisture = 0;
+            if (offset + 8 <= data.length) {
+                moisture = Number(data.readBigUInt64LE(offset));
+                offset += 8;
+            }
+            
+            let status = 0;
+            if (offset + 1 <= data.length) {
+                status = data.readUInt8(offset);
+                offset += 1;
+            }
+            
+            let is_test = 0;
+            if (offset + 1 <= data.length) {
+                is_test = data.readUInt8(offset);
+                offset += 1;
+            }
+            
             // Convert timestamp to ISO date string
-            // Timestamp is in seconds, convert to milliseconds
             let transaction_date = null;
             if (timestamp && timestamp > 0 && timestamp < 9999999999) {
                 try {
@@ -646,13 +688,13 @@ class SolanaService {
                 bump,
                 nonce,
                 transaction_count,
+                batch_id,
+                moisture,
+                status,
+                is_test,
                 created_at: timestamp,
                 updated_at: timestamp,
-                batch_ids: [],
-                status: 'completed',
-                is_test: 0,
-                moisture: null,
-                quality: null,
+                batch_ids: batch_id > 0 ? [batch_id] : [],
                 transaction_date: transaction_date,
                 data_format: 'binary' // Mark as binary format (on-chain only)
             };

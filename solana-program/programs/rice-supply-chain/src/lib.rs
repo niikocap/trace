@@ -15,6 +15,10 @@ pub mod rice_supply_chain {
         unit_price: u64,
         payment_reference: u8,
         nonce: u8,
+        batch_id: u64,
+        moisture: u64,
+        status: u8,
+        is_test: u8,
     ) -> Result<()> {
         let tx = &mut ctx.accounts.transaction;
 
@@ -29,15 +33,23 @@ pub mod rice_supply_chain {
         tx.quantity = quantity;
         tx.unit_price = unit_price;
         tx.payment_reference = payment_reference;
+        tx.batch_id = batch_id;
+        tx.moisture = moisture;
+        tx.status = status;
+        tx.is_test = is_test;
         tx.timestamp = Clock::get()?.unix_timestamp;
         tx.transaction_count = tx.transaction_count.saturating_add(1);
 
         msg!(
-            "tx created: from={} to={} qty={} price={} nonce={} count={}",
+            "tx created: from={} to={} qty={} price={} batch_id={} moisture={} status={} is_test={} nonce={} count={}",
             from_actor_id,
             to_actor_id,
             quantity,
             unit_price,
+            batch_id,
+            moisture,
+            status,
+            is_test,
             nonce,
             tx.transaction_count
         );
@@ -53,6 +65,10 @@ pub mod rice_supply_chain {
         quantity: u64,
         unit_price: u64,
         payment_reference: u8,
+        batch_id: u64,
+        moisture: u64,
+        status: u8,
+        is_test: u8,
     ) -> Result<()> {
         let tx = &mut ctx.accounts.transaction;
 
@@ -62,15 +78,23 @@ pub mod rice_supply_chain {
         tx.quantity = quantity;
         tx.unit_price = unit_price;
         tx.payment_reference = payment_reference;
+        tx.batch_id = batch_id;
+        tx.moisture = moisture;
+        tx.status = status;
+        tx.is_test = is_test;
         tx.timestamp = Clock::get()?.unix_timestamp;
         tx.transaction_count = tx.transaction_count.saturating_add(1);
 
         msg!(
-            "tx added (reused): from={} to={} qty={} price={} count={}",
+            "tx added (reused): from={} to={} qty={} price={} batch_id={} moisture={} status={} is_test={} count={}",
             from_actor_id,
             to_actor_id,
             quantity,
             unit_price,
+            batch_id,
+            moisture,
+            status,
+            is_test,
             tx.transaction_count
         );
 
@@ -103,7 +127,7 @@ pub mod rice_supply_chain {
 }
 
 #[derive(Accounts)]
-#[instruction(from_actor_id: u64, to_actor_id: u64, quantity: u64, unit_price: u64, payment_reference: u8, nonce: u8)]
+#[instruction(from_actor_id: u64, to_actor_id: u64, quantity: u64, unit_price: u64, payment_reference: u8, nonce: u8, batch_id: u64, moisture: u64, status: u8, is_test: u8)]
 pub struct CreateTransaction<'info> {
     #[account(
         init,
@@ -155,19 +179,27 @@ pub struct TransactionAccount {
     pub bump: u8,
     pub nonce: u8,
     pub transaction_count: u64,
+    pub batch_id: u64,             // Primary batch ID
+    pub moisture: u64,
+    pub status: u8,
+    pub is_test: u8,
 }
 
 impl TransactionAccount {
-    pub const SPACE: usize = 8
-        + 8
-        + 8
-        + 8
-        + 8
-        + 1
-        + 8
-        + 1
-        + 1
-        + 8;
+    pub const SPACE: usize = 8      // discriminator
+        + 8                         // from_actor_id
+        + 8                         // to_actor_id
+        + 8                         // quantity
+        + 8                         // unit_price
+        + 1                         // payment_reference
+        + 8                         // timestamp
+        + 1                         // bump
+        + 1                         // nonce
+        + 8                         // transaction_count
+        + 8                         // batch_id
+        + 8                         // moisture
+        + 1                         // status
+        + 1;                        // is_test
 }
 
 #[error_code]

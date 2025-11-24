@@ -2,7 +2,7 @@ services:
   - type: web
     name: rice-supply-chain
     env: node
-    buildCommand: cd backend && npm install && npm run init-db
+    buildCommand: cd backend && npm install
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
