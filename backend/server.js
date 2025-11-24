@@ -12,8 +12,22 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Cache control middleware - prevent stale data
+app.use((req, res, next) => {
+    // Don't cache API responses
+    if (req.path.startsWith('/api/')) {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+    }
+    next();
+});
+
 // Serve static files from frontend
-app.use(express.static(path.join(__dirname, '../frontend')));
+app.use(express.static(path.join(__dirname, '../frontend'), {
+    maxAge: '1h', // Cache static assets for 1 hour
+    etag: false
+}));
 
 // Import routes
 const transactionRoutes = require('./routes/transactions');
