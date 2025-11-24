@@ -791,9 +791,16 @@ function renderChainTransactionsTable() {
             batchDisplay = transaction.batch_ids.join(', ');
         }
         
-        // Show real actor IDs (not parsed names)
-        const fromActorDisplay = transaction.from_actor_id || '-';
-        const toActorDisplay = transaction.to_actor_id || '-';
+        // Show real actor IDs with hyperlinks to digisaka.app
+        const fromActorId = transaction.from_actor_id || '-';
+        const toActorId = transaction.to_actor_id || '-';
+        
+        const fromActorDisplay = fromActorId !== '-' 
+            ? `<a href="https://digisaka.app/api/mobile/trace/chain-actor/${fromActorId}" target="_blank" class="text-decoration-none">${fromActorId}</a>`
+            : '-';
+        const toActorDisplay = toActorId !== '-'
+            ? `<a href="https://digisaka.app/api/mobile/trace/chain-actor/${toActorId}" target="_blank" class="text-decoration-none">${toActorId}</a>`
+            : '-';
         
         // Format payment reference
         let paymentRef = 'Cash';
@@ -838,6 +845,22 @@ function renderChainTransactionsTable() {
             </td>
         `;
         tbody.appendChild(row);
+        
+        // Add click handlers for actor links after row is added to DOM
+        const fromLink = row.querySelector('td:nth-child(2) a');
+        const toLink = row.querySelector('td:nth-child(3) a');
+        if (fromLink) {
+            fromLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.open(fromLink.href, '_blank');
+            });
+        }
+        if (toLink) {
+            toLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.open(toLink.href, '_blank');
+            });
+        }
     });
 }
 

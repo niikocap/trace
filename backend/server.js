@@ -23,6 +23,47 @@ app.use((req, res, next) => {
     next();
 });
 
+// Middleware to filter is_test based on environment
+app.use((req, res, next) => {
+    // Store original json method
+    const originalJson = res.json;
+    
+    // Override json method to filter is_test
+    res.json = function(data) {
+        if (data && data.data) {
+            const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+            
+            // Filter is_test based on environment
+            if (Array.isArray(data.data)) {
+                data.data = data.data.map(item => {
+                    if (item.is_test !== undefined) {
+                        // Show is_test: 1 only to localhost
+                        // Show is_test: 0 to production
+                        if (!isLocalhost && item.is_test === 1) {
+                            // Filter out test transactions for production
+                            return null;
+                        }
+                        // For production, convert is_test to 0
+                        if (!isLocalhost && item.is_test !== undefined) {
+                            item.is_test = 0;
+                        }
+                    }
+                    return item;
+                }).filter(item => item !== null);
+            } else if (data.data && typeof data.data === 'object' && data.data.is_test !== undefined) {
+                // Single transaction
+                if (!isLocalhost && data.data.is_test === 1) {
+                    // Don't filter single transactions, just set is_test to 0
+                    data.data.is_test = 0;
+                }
+            }
+        }
+        return originalJson.call(this, data);
+    };
+    
+    next();
+});
+
 // Serve static files from frontend
 app.use(express.static(path.join(__dirname, '../frontend'), {
     maxAge: '1h', // Cache static assets for 1 hour
