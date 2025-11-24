@@ -16,6 +16,37 @@ class SolanaService {
         this.connection = null;
         this.program = null;
         this.programId = null;
+        this.requestDelay = 100; // Base delay in ms between requests
+        this.maxRetries = 3;
+    }
+
+    // Exponential backoff retry helper
+    async retryWithBackoff(fn, retries = this.maxRetries) {
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                // Add delay between requests to avoid rate limiting
+                if (attempt > 0) {
+                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Max 10s
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+                return await fn();
+            } catch (error) {
+                if (attempt === retries) {
+                    throw error;
+                }
+                // Check if error is rate limit related
+                if (error.message && (error.message.includes('429') || error.message.includes('Too Many Requests'))) {
+                    console.log(`Rate limited. Retrying in ${Math.pow(2, attempt)}s... (attempt ${attempt + 1}/${retries})`);
+                    continue;
+                }
+                throw error;
+            }
+        }
+    }
+
+    // Add delay between sequential requests
+    async delayRequest() {
+        await new Promise(resolve => setTimeout(resolve, this.requestDelay));
     }
 
     async initialize() {
@@ -121,16 +152,22 @@ class SolanaService {
 
             const transaction = new Transaction().add(ix, memoInstruction);
 
-            const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
+            const { blockhash, lastValidBlockHeight } = await this.retryWithBackoff(async () => {
+                return await this.connection.getLatestBlockhash();
+            });
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = walletKeypair.publicKey;
 
-            const signature = await this.connection.sendTransaction(transaction, [walletKeypair], {
-                commitment: 'confirmed',
-                preflightCommitment: 'confirmed',
+            const signature = await this.retryWithBackoff(async () => {
+                return await this.connection.sendTransaction(transaction, [walletKeypair], {
+                    commitment: 'confirmed',
+                    preflightCommitment: 'confirmed',
+                });
             });
 
-            await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+            await this.retryWithBackoff(async () => {
+                return await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+            });
 
             return {
                 signature,
@@ -179,8 +216,10 @@ class SolanaService {
             // Derive PDA from existing public key
             const transactionPda = new PublicKey(publicKey);
 
-            // Get account info to verify it exists
-            const accountInfo = await this.connection.getAccountInfo(transactionPda);
+            // Get account info to verify it exists with retry
+            const accountInfo = await this.retryWithBackoff(async () => {
+                return await this.connection.getAccountInfo(transactionPda);
+            });
             if (!accountInfo) {
                 throw new Error('Account does not exist. Use createRealTransaction first.');
             }
@@ -213,8 +252,10 @@ class SolanaService {
                 data: Buffer.from(jsonData, 'utf8')
             });
 
-            // Get latest blockhash
-            const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
+            // Get latest blockhash with retry
+            const { blockhash, lastValidBlockHeight } = await this.retryWithBackoff(async () => {
+                return await this.connection.getLatestBlockhash();
+            });
 
             // Create transaction
             const transaction = new Transaction({
@@ -225,15 +266,19 @@ class SolanaService {
             transaction.add(instruction);
             transaction.add(memoInstruction);
 
-            // Sign and send
+            // Sign and send with retry
             transaction.sign(walletKeypair);
 
-            const signature = await this.connection.sendTransaction(transaction, [walletKeypair], {
-                commitment: 'confirmed',
-                preflightCommitment: 'confirmed',
+            const signature = await this.retryWithBackoff(async () => {
+                return await this.connection.sendTransaction(transaction, [walletKeypair], {
+                    commitment: 'confirmed',
+                    preflightCommitment: 'confirmed',
+                });
             });
 
-            await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+            await this.retryWithBackoff(async () => {
+                return await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+            });
 
             return {
                 signature,
@@ -300,8 +345,10 @@ class SolanaService {
 
     async getMemoDataForTransaction(publicKey) {
         try {
-            // Get all transactions for this account to find the memo
-            const signatures = await this.connection.getSignaturesForAddress(new PublicKey(publicKey), { limit: 1 });
+            // Get all transactions for this account to find the memo with retry
+            const signatures = await this.retryWithBackoff(async () => {
+                return await this.connection.getSignaturesForAddress(new PublicKey(publicKey), { limit: 1 });
+            });
             
             if (!signatures || signatures.length === 0) {
                 console.log(`No signatures found for ${publicKey}`);
@@ -312,8 +359,11 @@ class SolanaService {
             const txSignature = signatures[0].signature;
             console.log(`Fetching transaction ${txSignature} for ${publicKey}`);
             
-            const transaction = await this.connection.getTransaction(txSignature, {
-                maxSupportedTransactionVersion: 0
+            await this.delayRequest();
+            const transaction = await this.retryWithBackoff(async () => {
+                return await this.connection.getTransaction(txSignature, {
+                    maxSupportedTransactionVersion: 0
+                });
             });
             
             if (!transaction || !transaction.transaction.message.instructions) {
@@ -377,8 +427,10 @@ class SolanaService {
 
     async getAllTransactions() {
         try {
-            // Get all accounts owned by our program
-            const accounts = await this.connection.getProgramAccounts(this.programId);
+            // Get all accounts owned by our program with retry logic
+            const accounts = await this.retryWithBackoff(async () => {
+                return await this.connection.getProgramAccounts(this.programId);
+            });
             console.log(`Found ${accounts.length} accounts for program ${this.programId.toString()}`);
             
             const transactions = [];
@@ -390,10 +442,13 @@ class SolanaService {
                     if (decoded && decoded.from_actor_id !== undefined) {
                         const publicKeyStr = account.pubkey.toString();
                         
-                        // Fetch the actual transaction signature
+                        // Fetch the actual transaction signature with delay and retry
                         let signature = publicKeyStr;
                         try {
-                            const actualSignature = await this.getTransactionSignature(publicKeyStr);
+                            await this.delayRequest();
+                            const actualSignature = await this.retryWithBackoff(async () => {
+                                return await this.getTransactionSignature(publicKeyStr);
+                            });
                             if (actualSignature) {
                                 signature = actualSignature;
                             }
@@ -431,7 +486,9 @@ class SolanaService {
     async getTransactionsByPublicKey(publicKey, includeMemo = false) {
         try {
             const pubkey = new PublicKey(publicKey);
-            const accountInfo = await this.connection.getAccountInfo(pubkey);
+            const accountInfo = await this.retryWithBackoff(async () => {
+                return await this.connection.getAccountInfo(pubkey);
+            });
             
             if (!accountInfo) {
                 return null;
