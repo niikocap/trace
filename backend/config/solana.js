@@ -16,18 +16,60 @@ class SolanaService {
         this.connection = null;
         this.program = null;
         this.programId = null;
-        this.requestDelay = 100; // Base delay in ms between requests
-        this.maxRetries = 3;
+        this.requestDelay = 500; // Increased base delay to 500ms between requests
+        this.maxRetries = 5; // Increased from 3 to 5 retries
+        this.lastRequestTime = 0;
+        this.requestQueue = [];
+        this.isProcessingQueue = false;
     }
 
-    // Exponential backoff retry helper
+    // Queue requests to prevent concurrent rate limiting
+    async queueRequest(fn) {
+        return new Promise((resolve, reject) => {
+            this.requestQueue.push({ fn, resolve, reject });
+            this.processQueue();
+        });
+    }
+
+    async processQueue() {
+        if (this.isProcessingQueue || this.requestQueue.length === 0) {
+            return;
+        }
+
+        this.isProcessingQueue = true;
+
+        while (this.requestQueue.length > 0) {
+            const { fn, resolve, reject } = this.requestQueue.shift();
+            
+            // Enforce minimum delay between requests
+            const timeSinceLastRequest = Date.now() - this.lastRequestTime;
+            if (timeSinceLastRequest < this.requestDelay) {
+                await new Promise(r => setTimeout(r, this.requestDelay - timeSinceLastRequest));
+            }
+
+            try {
+                this.lastRequestTime = Date.now();
+                const result = await this.retryWithBackoff(fn);
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+        }
+
+        this.isProcessingQueue = false;
+    }
+
+    // Exponential backoff retry helper with jitter
     async retryWithBackoff(fn, retries = this.maxRetries) {
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
-                // Add delay between requests to avoid rate limiting
+                // Add jitter to exponential backoff to prevent thundering herd
                 if (attempt > 0) {
-                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Max 10s
-                    await new Promise(resolve => setTimeout(resolve, delay));
+                    const baseDelay = Math.min(1000 * Math.pow(2, attempt - 1), 30000); // Max 30s
+                    const jitter = Math.random() * 1000; // Random 0-1s jitter
+                    const totalDelay = baseDelay + jitter;
+                    console.log(`Rate limited. Retrying in ${(totalDelay / 1000).toFixed(1)}s... (attempt ${attempt + 1}/${retries})`);
+                    await new Promise(resolve => setTimeout(resolve, totalDelay));
                 }
                 return await fn();
             } catch (error) {
@@ -35,8 +77,7 @@ class SolanaService {
                     throw error;
                 }
                 // Check if error is rate limit related
-                if (error.message && (error.message.includes('429') || error.message.includes('Too Many Requests'))) {
-                    console.log(`Rate limited. Retrying in ${Math.pow(2, attempt)}s... (attempt ${attempt + 1}/${retries})`);
+                if (error.message && (error.message.includes('429') || error.message.includes('Too Many Requests') || error.message.includes('rate'))) {
                     continue;
                 }
                 throw error;
@@ -152,20 +193,20 @@ class SolanaService {
 
             const transaction = new Transaction().add(ix, memoInstruction);
 
-            const { blockhash, lastValidBlockHeight } = await this.retryWithBackoff(async () => {
+            const { blockhash, lastValidBlockHeight } = await this.queueRequest(async () => {
                 return await this.connection.getLatestBlockhash();
             });
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = walletKeypair.publicKey;
 
-            const signature = await this.retryWithBackoff(async () => {
+            const signature = await this.queueRequest(async () => {
                 return await this.connection.sendTransaction(transaction, [walletKeypair], {
                     commitment: 'confirmed',
                     preflightCommitment: 'confirmed',
                 });
             });
 
-            await this.retryWithBackoff(async () => {
+            await this.queueRequest(async () => {
                 return await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
             });
 
@@ -216,8 +257,8 @@ class SolanaService {
             // Derive PDA from existing public key
             const transactionPda = new PublicKey(publicKey);
 
-            // Get account info to verify it exists with retry
-            const accountInfo = await this.retryWithBackoff(async () => {
+            // Get account info to verify it exists with queued requests
+            const accountInfo = await this.queueRequest(async () => {
                 return await this.connection.getAccountInfo(transactionPda);
             });
             if (!accountInfo) {
@@ -252,8 +293,8 @@ class SolanaService {
                 data: Buffer.from(jsonData, 'utf8')
             });
 
-            // Get latest blockhash with retry
-            const { blockhash, lastValidBlockHeight } = await this.retryWithBackoff(async () => {
+            // Get latest blockhash with queued requests
+            const { blockhash, lastValidBlockHeight } = await this.queueRequest(async () => {
                 return await this.connection.getLatestBlockhash();
             });
 
@@ -266,17 +307,17 @@ class SolanaService {
             transaction.add(instruction);
             transaction.add(memoInstruction);
 
-            // Sign and send with retry
+            // Sign and send with queued requests
             transaction.sign(walletKeypair);
 
-            const signature = await this.retryWithBackoff(async () => {
+            const signature = await this.queueRequest(async () => {
                 return await this.connection.sendTransaction(transaction, [walletKeypair], {
                     commitment: 'confirmed',
                     preflightCommitment: 'confirmed',
                 });
             });
 
-            await this.retryWithBackoff(async () => {
+            await this.queueRequest(async () => {
                 return await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
             });
 
@@ -345,8 +386,8 @@ class SolanaService {
 
     async getMemoDataForTransaction(publicKey) {
         try {
-            // Get all transactions for this account to find the memo with retry
-            const signatures = await this.retryWithBackoff(async () => {
+            // Get all transactions for this account to find the memo with queued requests
+            const signatures = await this.queueRequest(async () => {
                 return await this.connection.getSignaturesForAddress(new PublicKey(publicKey), { limit: 1 });
             });
             
@@ -359,8 +400,7 @@ class SolanaService {
             const txSignature = signatures[0].signature;
             console.log(`Fetching transaction ${txSignature} for ${publicKey}`);
             
-            await this.delayRequest();
-            const transaction = await this.retryWithBackoff(async () => {
+            const transaction = await this.queueRequest(async () => {
                 return await this.connection.getTransaction(txSignature, {
                     maxSupportedTransactionVersion: 0
                 });
@@ -427,8 +467,8 @@ class SolanaService {
 
     async getAllTransactions() {
         try {
-            // Get all accounts owned by our program with retry logic
-            const accounts = await this.retryWithBackoff(async () => {
+            // Get all accounts owned by our program with queued requests
+            const accounts = await this.queueRequest(async () => {
                 return await this.connection.getProgramAccounts(this.programId);
             });
             console.log(`Found ${accounts.length} accounts for program ${this.programId.toString()}`);
@@ -442,11 +482,10 @@ class SolanaService {
                     if (decoded && decoded.from_actor_id !== undefined) {
                         const publicKeyStr = account.pubkey.toString();
                         
-                        // Fetch the actual transaction signature with delay and retry
+                        // Fetch the actual transaction signature with queued requests
                         let signature = publicKeyStr;
                         try {
-                            await this.delayRequest();
-                            const actualSignature = await this.retryWithBackoff(async () => {
+                            const actualSignature = await this.queueRequest(async () => {
                                 return await this.getTransactionSignature(publicKeyStr);
                             });
                             if (actualSignature) {
@@ -486,7 +525,7 @@ class SolanaService {
     async getTransactionsByPublicKey(publicKey, includeMemo = false) {
         try {
             const pubkey = new PublicKey(publicKey);
-            const accountInfo = await this.retryWithBackoff(async () => {
+            const accountInfo = await this.queueRequest(async () => {
                 return await this.connection.getAccountInfo(pubkey);
             });
             
