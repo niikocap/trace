@@ -3,7 +3,8 @@
 // Configuration
 // Dynamic API base URL that works for both local development and deployed environments
 const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api`;
-const API_EXTERNAL_URL = "https://ds.capiroso.site"; //"https://digisaka.app";
+const API_EXTERNAL_URL = "https://digisaka.app";
+//  const API_EXTERNAL_URL = "https://ds.capiroso.site";
 
 // Global variables
 let currentSection = 'dashboard';
