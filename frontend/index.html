@@ -263,8 +263,11 @@
         <div id="production-seasons-section" class="content-section" style="display: none;">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5>Production Seasons</h5>
-                    <div>
+                    <h5><i class="fas fa-calendar-alt me-2"></i>Production Seasons</h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <button class="btn btn-sm btn-success" onclick="openModal('add', 'production_seasons')">
+                            <i class="fas fa-plus me-1"></i>Add New Season
+                        </button>
                         <input type="text" class="form-control d-inline-block" id="seasons-search"
                             placeholder="Search seasons..." style="width: 200px;">
                     </div>
@@ -303,8 +306,11 @@
         <div id="rice-batches-section" class="content-section" style="display: none;">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5>Rice Batches</h5>
-                    <div>
+                    <h5><i class="fas fa-boxes me-2"></i>Rice Batches</h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <button class="btn btn-sm btn-success" onclick="openModal('add', 'rice_batches')">
+                            <i class="fas fa-plus me-1"></i>Add New Batch
+                        </button>
                         <input type="text" class="form-control d-inline-block" id="batches-search"
                             placeholder="Search batches..." style="width: 200px;">
                     </div>
@@ -341,8 +347,11 @@
         <div id="milled-rice-section" class="content-section" style="display: none;">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5>Milled Rice</h5>
-                    <div>
+                    <h5><i class="fas fa-industry me-2"></i>Milled Rice</h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <button class="btn btn-sm btn-success" onclick="openModal('add', 'milled_rice')">
+                            <i class="fas fa-plus me-1"></i>Add New Milling
+                        </button>
                         <input type="text" class="form-control d-inline-block" id="milled-search"
                             placeholder="Search milled rice..." style="width: 200px;">
                     </div>
@@ -776,7 +785,12 @@
         <div id="drying-data-section" class="content-section" style="display: none;">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5><i class="fas fa-water me-2"></i>Drying Data</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="mb-0"><i class="fas fa-water me-2"></i>Drying Data</h5>
+                        <button class="btn btn-sm btn-success" onclick="openModal('add', 'drying_data')">
+                            <i class="fas fa-plus me-1"></i>Add New Drying
+                        </button>
+                    </div>
                     <div>
                         <input type="text" class="form-control d-inline-block" id="drying-search"
                             placeholder="Search drying records..." style="width: 250px;">
@@ -816,22 +830,27 @@
     <!-- Modal for Add/Edit Forms -->
     <div class="modal fade" id="entityModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalTitle">Add New</h5>
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-0 py-4">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-1" id="modalTitle">Add New</h5>
+                        <small class="text-muted" id="modalSubtitle"></small>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body p-4">
                     <form id="entityForm">
-                        <div id="formFields" class="row">
+                        <div id="formFields" class="row g-3">
                             <!-- Form fields will be dynamically generated -->
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <div class="modal-footer bg-light border-top py-3">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </button>
                     <button type="button" class="btn btn-primary" id="saveBtn">
-                        <i class="fas fa-save me-2"></i>Save
+                        <i class="fas fa-save me-2"></i><span id="saveBtnText">Save</span>
                     </button>
                 </div>
             </div>
@@ -866,6 +885,31 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Entity Add/Edit Modal -->
+    <div class="modal fade" id="entityModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Add New Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="entityForm">
+                        <div id="formFields">
+                            <!-- Form fields will be dynamically generated -->
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveEntityBtn" onclick="saveEntity()">
+                        <i class="fas fa-save me-2"></i>Save
+                    </button>
                 </div>
             </div>
         </div>

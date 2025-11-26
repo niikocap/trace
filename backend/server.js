@@ -76,6 +76,7 @@ const chainActorRoutes = require('./routes/chainActors');
 const productionSeasonRoutes = require('./routes/productionSeasons');
 const milledRiceRoutes = require('./routes/milledRice');
 const riceBatchRoutes = require('./routes/riceBatches');
+const dryingDataRoutes = require('./routes/dryingData');
 
 // API Routes
 app.use('/api/transactions', transactionRoutes);
@@ -83,6 +84,7 @@ app.use('/api/chain-actors', chainActorRoutes);
 app.use('/api/production-seasons', productionSeasonRoutes);
 app.use('/api/milled-rice', milledRiceRoutes);
 app.use('/api/rice-batches', riceBatchRoutes);
+app.use('/api/drying-data', dryingDataRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
