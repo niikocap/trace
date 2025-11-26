@@ -1,36 +1,40 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rice Supply Chain Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <link href="css/styles.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
     <!-- QR Code Scanner Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
+
 <body>
     <!-- Top Navigation Bar -->
     <nav class="navbar navbar-expand-lg fixed-top top-navbar">
         <div class="container-fluid px-4">
-            <button class="btn btn-outline-secondary btn-sm sidebar-toggle d-none d-md-none" id="sidebarToggle" title="Toggle menu">
+            <button class="btn btn-outline-secondary btn-sm sidebar-toggle d-none d-md-none" id="sidebarToggle"
+                title="Toggle menu">
                 <i class="fas fa-bars"></i>
             </button>
-            
+
             <div class="navbar-brand d-flex align-items-center">
                 <i class="fas fa-seedling me-2"></i>
                 <span class="fw-semibold d-none d-sm-inline">DigiSaka TRACE | Rice Supply Chain</span>
                 <span class="fw-semibold d-sm-none">DigiSaka</span>
             </div>
-            
+
             <div class="d-flex align-items-center gap-2">
                 <button class="btn btn-outline-secondary btn-sm theme-toggle" id="themeToggle" title="Toggle theme">
                     <i class="fas fa-moon" id="themeIcon"></i>
                 </button>
-                
+
                 <div class="d-flex align-items-center d-none d-sm-flex">
                     <span class="text-muted small me-2">Welcome back</span>
                     <div class="user-avatar">
@@ -45,617 +49,768 @@
     <nav class="sidebar">
         <div class="position-sticky pt-3" style="overflow-y: auto; max-height: calc(100vh - 60px);">
             <ul class="nav flex-column">
-                <!-- Dashboard -->
-                <!-- <li class="nav-item">
-                    <a class="nav-link active" href="#" data-section="dashboard">
-                        <i class="fas fa-tachometer-alt"></i> Dashboard
-                    </a>
-                </li> -->
                 
+
                 <!-- Chain Actors -->
-                <!-- <li class="nav-item">
+                <li class="nav-item">
                     <a class="nav-link" href="#" data-section="chain-actors">
                         <i class="fas fa-users"></i> Chain Actors
                     </a>
-                </li> -->
-                
+                </li>
+
                 <!-- Production Seasons -->
-                <!-- <li class="nav-item">
+                <li class="nav-item">
                     <a class="nav-link" href="#" data-section="production-seasons">
                         <i class="fas fa-calendar-alt"></i> Production Seasons
                     </a>
-                </li> -->
-                
+                </li>
+
                 <!-- Rice Batches -->
-                <!-- <li class="nav-item">
+                <li class="nav-item">
                     <a class="nav-link" href="#" data-section="rice-batches">
                         <i class="fas fa-boxes"></i> Rice Batches
                     </a>
-                </li> -->
-                
+                </li>
+
                 <!-- Milled Rice -->
-                <!-- <li class="nav-item">
+                <li class="nav-item">
                     <a class="nav-link" href="#" data-section="milled-rice">
                         <i class="fas fa-industry"></i> Milled Rice
                     </a>
-                </li> -->
-                
+                </li>
+
                 <!-- Chain Transactions -->
                 <li class="nav-item">
                     <a class="nav-link" href="#" data-section="chain-transactions">
                         <i class="fas fa-link"></i> Chain Transactions
                     </a>
                 </li>
-                
+
+                <!-- Transaction Summary -->
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="transaction-summary">
+                        <i class="fas fa-file-invoice"></i> Transaction Summary
+                    </a>
+                </li>
+
+                <!-- Drying Data -->
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="drying-data">
+                        <i class="fas fa-water"></i> Drying Data
+                    </a>
+                </li>
+
                 <!-- Batch Tracker -->
                 <li class="nav-item">
                     <a class="nav-link" href="#" data-section="batch-tracker">
                         <i class="fas fa-search"></i> Batch Tracker
                     </a>
                 </li>
-                
-                <!-- API Tester -->
-                <!-- <li class="nav-item">
-                    <a class="nav-link" href="#" data-section="api-tester">
-                        <i class="fas fa-code"></i> API Tester
-                    </a>
-                </li> -->
             </ul>
         </div>
     </nav>
 
     <!-- Main content -->
     <main class="main-content">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-4">
-                    <h1 class="h2 page-title" id="page-title">Dashboard</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <button type="button" class="btn btn-primary add-btn" id="add-btn" style="display: none;">
-                            <i class="fas fa-plus me-2"></i>Add New
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-4">
+            <h1 class="h2 page-title" id="page-title">Dashboard</h1>
+            <div class="btn-toolbar mb-2 mb-md-0">
+                <button type="button" class="btn btn-primary add-btn" id="add-btn" style="display: none;">
+                    <i class="fas fa-plus me-2"></i>Add New
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="content-section">
+            <div class="row g-3" style="margin-bottom: 1rem;">
+                <div class="col">
+                    <div class="card text-white bg-primary h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Chain Actors</h6>
+                                    <h3 id="actors-count">-</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-users fa-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card text-white bg-success h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Rice Batches</h6>
+                                    <h3 id="batches-count">-</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-boxes fa-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card text-white bg-info h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Milled Rice</h6>
+                                    <h3 id="milled-count">-</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-industry fa-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card text-white bg-warning h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Transactions</h6>
+                                    <h3 id="transactions-count">-</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-link fa-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card text-white h-100"
+                        style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Seasons</h6>
+                                    <h3 id="seasons-count">-</h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-calendar-alt fa-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-line me-2"></i>Recent Blockchain Activity</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="recent-transactions">
+                                <!-- Recent transactions will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chain Actors Section -->
+        <div id="chain-actors-section" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-users me-2"></i>Chain Actors</h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <button class="btn btn-sm btn-success" onclick="openChainActorModal('add')">
+                            <i class="fas fa-plus me-1"></i>Add New Actor
+                        </button>
+                        <input type="text" class="form-control d-inline-block" id="actors-search"
+                            placeholder="Search actors..." style="width: 200px;">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="actors-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Actor Type</th>
+                                    <th>Organization</th>
+                                    <th>Contact Number</th>
+                                    <th>Address</th>
+                                    <th>Balance</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="actors-tbody">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="actors-pagination" class="mt-3">
+                        <!-- Pagination will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Production Seasons Section -->
+        <div id="production-seasons-section" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>Production Seasons</h5>
+                    <div>
+                        <input type="text" class="form-control d-inline-block" id="seasons-search"
+                            placeholder="Search seasons..." style="width: 200px;">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="seasons-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Farmer ID</th>
+                                    <th>Crop Year</th>
+                                    <th>Variety</th>
+                                    <th>Planting Date</th>
+                                    <th>Harvest Date</th>
+                                    <th>Total Yield</th>
+                                    <th>Moisture</th>
+                                    <th>Carbon Certified</th>
+                                    <th>Validation Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="seasons-tbody">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="seasons-pagination" class="mt-3">
+                        <!-- Pagination will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rice Batches Section -->
+        <div id="rice-batches-section" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>Rice Batches</h5>
+                    <div>
+                        <input type="text" class="form-control d-inline-block" id="batches-search"
+                            placeholder="Search batches..." style="width: 200px;">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="batches-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>QR Code</th>
+                                    <th>Weight</th>
+                                    <th>Moisture</th>
+                                    <th>Variety</th>
+                                    <th>Current Holder</th>
+                                    <th>Price/kg</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batches-tbody">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="batches-pagination" class="mt-3">
+                        <!-- Pagination will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Milled Rice Section -->
+        <div id="milled-rice-section" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>Milled Rice</h5>
+                    <div>
+                        <input type="text" class="form-control d-inline-block" id="milled-search"
+                            placeholder="Search milled rice..." style="width: 200px;">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="milled-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Farmer ID</th>
+                                    <th>Total Weight</th>
+                                    <th>Milling Type</th>
+                                    <th>Quality</th>
+                                    <th>Moisture</th>
+                                    <th>Weight Processed</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="milled-tbody">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="milled-pagination" class="mt-3">
+                        <!-- Pagination will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chain Transactions Section -->
+        <div id="chain-transactions-section" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5><i class="fas fa-link me-2"></i>Chain Transactions (Blockchain)</h5>
+                        <small class="text-muted">Live blockchain transactions from Solana network</small>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="text" class="form-control form-control-sm" id="transactions-search-header"
+                            placeholder="Search..." style="width: 200px;">
+                        <button class="btn btn-sm btn-outline-secondary" id="filter-toggle-btn-header" type="button"
+                            title="Toggle Filters">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="loadChainTransactions()" type="button"
+                            title="Refresh Transactions">
+                            <i class="fas fa-sync-alt"></i> Refresh
                         </button>
                     </div>
                 </div>
-
-                <!-- Dashboard Section -->
-                <div id="dashboard-section" class="content-section">
-                    <div class="row g-3" style="margin-bottom: 1rem;">
-                        <div class="col">
-                            <div class="card text-white bg-primary h-100">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between">
-                                        <div>
-                                            <h6 class="card-title">Chain Actors</h6>
-                                            <h3 id="actors-count">-</h3>
-                                        </div>
-                                        <div class="align-self-center">
-                                            <i class="fas fa-users fa-lg"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="card text-white bg-success h-100">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between">
-                                        <div>
-                                            <h6 class="card-title">Rice Batches</h6>
-                                            <h3 id="batches-count">-</h3>
-                                        </div>
-                                        <div class="align-self-center">
-                                            <i class="fas fa-boxes fa-lg"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="card text-white bg-info h-100">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between">
-                                        <div>
-                                            <h6 class="card-title">Milled Rice</h6>
-                                            <h3 id="milled-count">-</h3>
-                                        </div>
-                                        <div class="align-self-center">
-                                            <i class="fas fa-industry fa-lg"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="card text-white bg-warning h-100">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between">
-                                        <div>
-                                            <h6 class="card-title">Transactions</h6>
-                                            <h3 id="transactions-count">-</h3>
-                                        </div>
-                                        <div class="align-self-center">
-                                            <i class="fas fa-link fa-lg"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="card text-white h-100" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between">
-                                        <div>
-                                            <h6 class="card-title">Seasons</h6>
-                                            <h3 id="seasons-count">-</h3>
-                                        </div>
-                                        <div class="align-self-center">
-                                            <i class="fas fa-calendar-alt fa-lg"></i>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                <div class="card-body">
+                    <div id="transactions-filters-container">
+                        <!-- Filters will be loaded here -->
                     </div>
-                    
+
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="transactions-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Batch ID</th>
+                                    <th>From Actor</th>
+                                    <th>To Actor</th>
+                                    <th>Quantity</th>
+                                    <th>Total Amount</th>
+                                    <th>Payment Reference</th>
+                                    <th>Moisture</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-tbody">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="transactions-pagination-container" class="mt-3">
+                        <!-- Pagination will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- API Tester Section -->
+        <div id="api-tester-section" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-code me-2"></i>API Tester</h5>
+                    <small class="text-muted">Test API endpoints like Postman</small>
+                </div>
+                <div class="card-body">
                     <div class="row">
-                        <div class="col-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5><i class="fas fa-chart-line me-2"></i>Recent Blockchain Activity</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div id="recent-transactions">
-                                        <!-- Recent transactions will be loaded here -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Chain Actors Section -->
-                <div id="chain-actors-section" class="content-section" style="display: none;">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5>Chain Actors</h5>
-                            <div>
-                                <input type="text" class="form-control d-inline-block" id="actors-search" placeholder="Search actors..." style="width: 200px;">
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover" id="actors-table">
-                                    <thead class="table-dark">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Name</th>
-                                            <th>Type</th>
-                                            <th>Contact Info</th>
-                                            <th>Location</th>
-                                            <th>Group</th>
-                                            <th>Farmer ID</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="actors-tbody">
-                                        <!-- Data will be loaded here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Production Seasons Section -->
-                <div id="production-seasons-section" class="content-section" style="display: none;">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5>Production Seasons</h5>
-                            <div>
-                                <input type="text" class="form-control d-inline-block" id="seasons-search" placeholder="Search seasons..." style="width: 200px;">
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover" id="seasons-table">
-                                    <thead class="table-dark">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Season Name</th>
-                                            <th>Planting Date</th>
-                                            <th>Harvesting Date</th>
-                                            <th>Variety</th>
-                                            <th>Carbon Certified</th>
-                                            <th>Farmer ID</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="seasons-tbody">
-                                        <!-- Data will be loaded here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Rice Batches Section -->
-                <div id="rice-batches-section" class="content-section" style="display: none;">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5>Rice Batches</h5>
-                            <div>
-                                <input type="text" class="form-control d-inline-block" id="batches-search" placeholder="Search batches..." style="width: 200px;">
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover" id="batches-table">
-                                    <thead class="table-dark">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Batch Number</th>
-                                            <th>Farmer</th>
-                                            <th>Rice Variety</th>
-                                            <th>Harvest Date</th>
-                                            <th>Quantity</th>
-                                            <th>Quality Grade</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="batches-tbody">
-                                        <!-- Data will be loaded here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Milled Rice Section -->
-                <div id="milled-rice-section" class="content-section" style="display: none;">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5>Milled Rice</h5>
-                            <div>
-                                <input type="text" class="form-control d-inline-block" id="milled-search" placeholder="Search milled rice..." style="width: 200px;">
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover" id="milled-table">
-                                    <thead class="table-dark">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Batch</th>
-                                            <th>Miller</th>
-                                            <th>Milling Date</th>
-                                            <th>Input Quantity</th>
-                                            <th>Output Quantity</th>
-                                            <th>Yield %</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="milled-tbody">
-                                        <!-- Data will be loaded here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Chain Transactions Section -->
-                <div id="chain-transactions-section" class="content-section" style="display: none;">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5><i class="fas fa-link me-2"></i>Chain Transactions (Blockchain)</h5>
-                                <small class="text-muted">Live blockchain transactions from Solana network</small>
-                            </div>
-                            <div class="d-flex gap-2 align-items-center">
-                                <input type="text" class="form-control form-control-sm" id="transactions-search-header" 
-                                       placeholder="Search..." style="width: 200px;">
-                                <button class="btn btn-sm btn-outline-secondary" id="filter-toggle-btn-header" type="button" title="Toggle Filters">
-                                    <i class="fas fa-filter"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-primary" onclick="loadChainTransactions()" type="button" title="Refresh Transactions">
-                                    <i class="fas fa-sync-alt"></i> Refresh
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div id="transactions-filters-container">
-                                <!-- Filters will be loaded here -->
-                            </div>
-                            
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover" id="transactions-table">
-                                    <thead class="table-dark">
-                                        <tr>
-                                            <th>Batch ID</th>
-                                            <th>From Actor</th>
-                                            <th>To Actor</th>
-                                            <th>Quantity</th>
-                                            <th>Total Amount</th>
-                                            <th>Payment Reference</th>
-                                            <th>Moisture</th>
-                                            <th>Date</th>
-                                            <th>Status</th>
-                                            <th>Data Format</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="transactions-tbody">
-                                        <!-- Data will be loaded here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <div id="transactions-pagination-container" class="mt-3">
-                                <!-- Pagination will be loaded here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-
-                <!-- API Tester Section -->
-                <div id="api-tester-section" class="content-section" style="display: none;">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="fas fa-code me-2"></i>API Tester</h5>
-                            <small class="text-muted">Test API endpoints like Postman</small>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">HTTP Method</label>
-                                        <select class="form-select" id="api-method">
-                                            <option value="GET">GET</option>
-                                            <option value="POST">POST</option>
-                                            <option value="PUT">PUT</option>
-                                            <option value="DELETE">DELETE</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Endpoint</label>
-                                        <select class="form-select" id="api-endpoint">
-                                            <option value="/api/chain-actors">Chain Actors</option>
-                                            <option value="/api/production-seasons">Production Seasons</option>
-                                            <option value="/api/rice-batches">Rice Batches</option>
-                                            <option value="/api/milled-rice">Milled Rice</option>
-                                            <option value="/api/transactions">Transactions</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            
+                        <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">Full URL</label>
-                                <input type="text" class="form-control" id="api-url" value="" readonly>
+                                <label class="form-label">HTTP Method</label>
+                                <select class="form-select" id="api-method">
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="PUT">PUT</option>
+                                    <option value="DELETE">DELETE</option>
+                                </select>
                             </div>
-                            
-                            <!-- Headers Section -->
+                        </div>
+                        <div class="col-md-6">
                             <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <label class="form-label mb-0">
-                                        <i class="fas fa-cog me-1"></i>Request Headers
-                                    </label>
-                                    <button type="button" class="btn btn-sm btn-primary" id="add-header-btn">
-                                        <i class="fas fa-plus me-1"></i>Add Header
-                                    </button>
-                                </div>
-                                
-                                <div class="table-responsive">
-                                    <table class="table table-bordered table-hover">
-                                        <thead class="table-primary">
-                                            <tr>
-                                                <th style="width: 40%;">
-                                                    <i class="fas fa-key me-1"></i>Header Name
-                                                </th>
-                                                <th style="width: 50%;">
-                                                    <i class="fas fa-edit me-1"></i>Header Value
-                                                </th>
-                                                <th style="width: 10%;" class="text-center">
-                                                    <i class="fas fa-cog"></i>Action
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="headers-table-body">
-                                            <!-- Header rows will be added here -->
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <label class="form-label">Endpoint</label>
+                                <select class="form-select" id="api-endpoint">
+                                    <option value="/api/chain-actors">Chain Actors</option>
+                                    <option value="/api/production-seasons">Production Seasons</option>
+                                    <option value="/api/rice-batches">Rice Batches</option>
+                                    <option value="/api/milled-rice">Milled Rice</option>
+                                    <option value="/api/transactions">Transactions</option>
+                                </select>
                             </div>
-                            
-                            <!-- Body Section -->
-                            <div class="mb-3" id="request-body-section" style="display: none;">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <label class="form-label mb-0">
-                                        <i class="fas fa-file-code me-1"></i>Request Body Parameters
-                                    </label>
-                                    <button type="button" class="btn btn-sm btn-outline-success" id="generate-sample-btn">
-                                        <i class="fas fa-magic me-1"></i>Generate Sample Data
-                                    </button>
-                                </div>
-                                
-                                <div class="table-responsive">
-                                    <table class="table table-bordered table-hover">
-                                        <thead class="table-success">
-                                            <tr>
-                                                <th style="width: 50%;">
-                                                    <i class="fas fa-key me-1"></i>Parameter Name
-                                                </th>
-                                                <th style="width: 50%;">
-                                                    <i class="fas fa-edit me-1"></i>Parameter Value
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="params-table-body">
-                                            <!-- Parameter rows will be added here -->
-                                        </tbody>
-                                    </table>
-                                </div>
-                                
-                                <div class="mt-2">
-                                    <small class="text-muted">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Fill in the parameter values above. The request body will be automatically generated as JSON.
-                                    </small>
-                                </div>
-                            </div>
-                            
-                            <!-- <div class="mb-3" id="request-body-section" style="display: none;">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Full URL</label>
+                        <input type="text" class="form-control" id="api-url" value="" readonly>
+                    </div>
+
+                    <!-- Headers Section -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <label class="form-label mb-0">
+                                <i class="fas fa-cog me-1"></i>Request Headers
+                            </label>
+                            <button type="button" class="btn btn-sm btn-primary" id="add-header-btn">
+                                <i class="fas fa-plus me-1"></i>Add Header
+                            </button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th style="width: 40%;">
+                                            <i class="fas fa-key me-1"></i>Header Name
+                                        </th>
+                                        <th style="width: 50%;">
+                                            <i class="fas fa-edit me-1"></i>Header Value
+                                        </th>
+                                        <th style="width: 10%;" class="text-center">
+                                            <i class="fas fa-cog"></i>Action
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="headers-table-body">
+                                    <!-- Header rows will be added here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Body Section -->
+                    <div class="mb-3" id="request-body-section" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <label class="form-label mb-0">
+                                <i class="fas fa-file-code me-1"></i>Request Body Parameters
+                            </label>
+                            <button type="button" class="btn btn-sm btn-outline-success" id="generate-sample-btn">
+                                <i class="fas fa-magic me-1"></i>Generate Sample Data
+                            </button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead class="table-success">
+                                    <tr>
+                                        <th style="width: 50%;">
+                                            <i class="fas fa-key me-1"></i>Parameter Name
+                                        </th>
+                                        <th style="width: 50%;">
+                                            <i class="fas fa-edit me-1"></i>Parameter Value
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="params-table-body">
+                                    <!-- Parameter rows will be added here -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Fill in the parameter values above. The request body will be automatically generated as
+                                JSON.
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- <div class="mb-3" id="request-body-section" style="display: none;">
                                 <label class="form-label">Request Body (JSON)</label>
                                 <textarea class="form-control" id="api-body" rows="8" placeholder='{
   "name": "Example",
   "type": "farmer"
 }'></textarea>
                             </div> -->
-                            
-                            <div class="d-flex gap-2 mb-4">
-                                <button class="btn btn-primary" id="send-request">
-                                    <i class="fas fa-paper-plane me-2"></i>Send Request
-                                </button>
-                                <button class="btn btn-outline-secondary" id="clear-response">
-                                    <i class="fas fa-trash me-2"></i>Clear
+
+                    <div class="d-flex gap-2 mb-4">
+                        <button class="btn btn-primary" id="send-request">
+                            <i class="fas fa-paper-plane me-2"></i>Send Request
+                        </button>
+                        <button class="btn btn-outline-secondary" id="clear-response">
+                            <i class="fas fa-trash me-2"></i>Clear
+                        </button>
+                    </div>
+
+                    <div class="response-section">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Response</h6>
+                            <div id="response-status" class="badge bg-secondary">Ready</div>
+                        </div>
+                        <div class="border rounded p-3"
+                            style="background-color: var(--bg-secondary); min-height: 200px;">
+                            <pre id="api-response" class="mb-0"
+                                style="white-space: pre-wrap; word-wrap: break-word;">Click "Send Request" to see the response here...</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction Summary Section -->
+        <div id="transaction-summary-section" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-file-invoice me-2"></i>Transaction Summary</h5>
+                    <div>
+                        <select class="form-select d-inline-block" id="transaction-filter" style="width: 200px;">
+                            <option value="all" selected>All</option>
+                            <option value="blo">BLO</option>
+                            <option value="coop">COOP</option>
+                            <option value="buyback">Buyback</option>
+                            <option value="individual">Individual</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="transaction-summary-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Season</th>
+                                    <th>Farmers Name</th>
+                                    <th>Address</th>
+                                    <th>HA</th>
+                                    <th>Variety</th>
+                                    <th>KGS</th>
+                                    <th>Price/KG</th>
+                                    <th>Fresh Harvest</th>
+                                    <th>Category</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transaction-summary-tbody">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batch Tracker Section -->
+        <div id="batch-tracker-section" class="content-section" style="display: none;">
+            <!-- Transaction Summary at Top (kept for reference) -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-file-invoice me-2"></i>Transaction Summary</h5>
+                    <div>
+                        <select class="form-select d-inline-block" id="transaction-filter" style="width: 200px;">
+                            <option value="all" selected>All</option>
+                            <option value="blo">BLO</option>
+                            <option value="coop">COOP</option>
+                            <option value="buyback">Buyback</option>
+                            <option value="individual">Individual</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="transaction-summary-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Season</th>
+                                    <th>Farmers Name</th>
+                                    <th>Address</th>
+                                    <th>HA</th>
+                                    <th>Variety</th>
+                                    <th>KGS</th>
+                                    <th>Price/KG</th>
+                                    <th>Fresh Harvest</th>
+                                    <th>Badge</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transaction-summary-tbody">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-search me-2"></i>Select Batch</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- QR Scanner Button -->
+                            <div class="mb-3">
+                                <button class="btn btn-primary w-100 mb-2" id="qr-scanner-toggle" type="button">
+                                    <i class="fas fa-qrcode me-2"></i>Scan QR Code
                                 </button>
                             </div>
-                            
-                            <div class="response-section">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="mb-0">Response</h6>
-                                    <div id="response-status" class="badge bg-secondary">Ready</div>
-                                </div>
-                                <div class="border rounded p-3" style="background-color: var(--bg-secondary); min-height: 200px;">
-                                    <pre id="api-response" class="mb-0" style="white-space: pre-wrap; word-wrap: break-word;">Click "Send Request" to see the response here...</pre>
+
+                            <hr>
+
+                            <!-- Search Section -->
+                            <div class="mb-3">
+                                <label class="form-label">Search Batch</label>
+                                <input type="text" class="form-control" id="batch-search-input"
+                                    placeholder="Search by batch number or ID...">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Available Batches</label>
+                                <div class="list-group" id="batch-list" style="max-height: 400px; overflow-y: auto;">
+                                    <!-- Batch list will be populated here -->
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Batch Tracker Section -->
-                <div id="batch-tracker-section" class="content-section" style="display: none;">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5><i class="fas fa-search me-2"></i>Select Batch</h5>
-                                </div>
-                                <div class="card-body">
-                                    <!-- QR Scanner Button -->
-                                    <div class="mb-3">
-                                        <button class="btn btn-primary w-100 mb-2" id="qr-scanner-toggle" type="button">
-                                            <i class="fas fa-qrcode me-2"></i>Scan QR Code
-                                        </button>
-                                    </div>
-                                    
-                                    <hr>
-                                    
-                                    <!-- Search Section -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Search Batch</label>
-                                        <input type="text" class="form-control" id="batch-search-input" placeholder="Search by batch number or ID...">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Available Batches</label>
-                                        <div class="list-group" id="batch-list" style="max-height: 400px; overflow-y: auto;">
-                                            <!-- Batch list will be populated here -->
-                                        </div>
-                                    </div>
+                <div class="col-md-8">
+                    <div id="batch-details" style="display: none;">
+                        <!-- Batch Overview Card -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="fas fa-box me-2"></i>Batch Overview</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row" id="batch-overview">
+                                    <!-- Batch details will be populated here -->
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="col-md-8">
-                            <div id="batch-details" style="display: none;">
-                                <!-- Batch Overview Card -->
-                                <div class="card mb-3">
-                                    <div class="card-header bg-primary text-white">
-                                        <h5 class="mb-0"><i class="fas fa-box me-2"></i>Batch Overview</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row" id="batch-overview">
-                                            <!-- Batch details will be populated here -->
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <!-- Farmer Information Card -->
-                                <div class="card mb-3">
-                                    <div class="card-header bg-success text-white">
-                                        <h5 class="mb-0"><i class="fas fa-user me-2"></i>Farmer Information</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row" id="farmer-info">
-                                            <!-- Farmer details will be populated here -->
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Season Information Card -->
-                                <div class="card mb-3">
-                                    <div class="card-header bg-info text-white">
-                                        <h5 class="mb-0"><i class="fas fa-calendar me-2"></i>Season Information</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row" id="season-info">
-                                            <!-- Season details will be populated here -->
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Milling Data Card -->
-                                <div class="card mb-3">
-                                    <div class="card-header bg-warning text-white">
-                                        <h5 class="mb-0"><i class="fas fa-industry me-2"></i>Milling Data</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div id="milling-data">
-                                            <!-- Milling data will be populated here -->
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Transaction History Card -->
-                                <div class="card mb-3">
-                                    <div class="card-header bg-danger text-white">
-                                        <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Transaction History</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-sm" id="batch-transactions-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Date</th>
-                                                        <th>Type</th>
-                                                        <th>From</th>
-                                                        <th>To</th>
-                                                        <th>Amount</th>
-                                                        <th>Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="batch-transactions-tbody">
-                                                    <!-- Transaction data will be populated here -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
+                        <!-- Farmer Information Card -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-user me-2"></i>Farmer Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row" id="farmer-info">
+                                    <!-- Farmer details will be populated here -->
                                 </div>
                             </div>
+                        </div>
 
-                            <!-- Empty State -->
-                            <div id="batch-empty-state" class="text-center py-5">
-                                <i class="fas fa-search fa-3x text-muted mb-3"></i>
-                                <h5 class="text-muted">Select a batch to view details</h5>
-                                <p class="text-muted">Choose a batch from the list on the left to see comprehensive tracking information.</p>
+                        <!-- Season Information Card -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fas fa-calendar me-2"></i>Season Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row" id="season-info">
+                                    <!-- Season details will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Milling Data Card -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="fas fa-industry me-2"></i>Milling Data</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="milling-data">
+                                    <!-- Milling data will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Transaction History Card -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Transaction History</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm" id="batch-transactions-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Type</th>
+                                                <th>From</th>
+                                                <th>To</th>
+                                                <th>Amount</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="batch-transactions-tbody">
+                                            <!-- Transaction data will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Empty State -->
+                    <div id="batch-empty-state" class="text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Select a batch to view details</h5>
+                        <p class="text-muted">Choose a batch from the list on the left to see comprehensive tracking
+                            information.</p>
+                    </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Drying Data Section -->
+        <div id="drying-data-section" class="content-section" style="display: none;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-water me-2"></i>Drying Data</h5>
+                    <div>
+                        <input type="text" class="form-control d-inline-block" id="drying-search"
+                            placeholder="Search drying records..." style="width: 250px;">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="drying-data-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Method</th>
+                                    <th>Initial MC</th>
+                                    <th>Final MC</th>
+                                    <th>Initial Weight</th>
+                                    <th>Final Weight</th>
+                                    <th>Duration</th>
+                                    <th>Temperature</th>
+                                    <th>Humidity</th>
+                                    <th>Airflow</th>
+                                    <th>Price</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drying-data-tbody">
+                                <!-- Data will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="drying-pagination" class="mt-3">
+                        <!-- Pagination will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- Modal for Add/Edit Forms -->
@@ -716,6 +871,31 @@
         </div>
     </div>
 
+    <!-- Chain Actor Add/Edit Modal -->
+    <div class="modal fade" id="chainActorModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="chainActorModalTitle">Add New Chain Actor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="chainActorForm">
+                        <div id="chainActorFormFields">
+                            <!-- Form fields will be dynamically generated -->
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveChainActorBtn" onclick="saveChainActor()">
+                        <i class="fas fa-save me-2"></i>Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
         <div id="toast" class="toast" role="alert">
@@ -732,4 +912,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/app.js"></script>
 </body>
+
 </html>
+

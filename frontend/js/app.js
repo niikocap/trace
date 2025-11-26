@@ -3,6 +3,7 @@
 // Configuration
 // Dynamic API base URL that works for both local development and deployed environments
 const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api`;
+const API_EXTERNAL_URL = "https://ds.capiroso.site"; //"https://digisaka.app";
 
 // Global variables
 let currentSection = 'dashboard';
@@ -26,7 +27,7 @@ let transactionsPaginationState = {
 };
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initializeApp();
 });
 
@@ -48,9 +49,9 @@ function initializeApiTester() {
     const requestBodySection = document.getElementById('request-body-table-section');
     const headersTextarea = document.getElementById('api-headers');
     const bodyTextarea = document.getElementById('api-body');
-    
+
     if (!apiUrlInput || !endpointSelect) return; // Elements may not exist yet
-    
+
     function updateApiUrl() {
         const selectedEndpoint = endpointSelect.value;
         apiUrlInput.value = `${currentDomain}${selectedEndpoint}`;
@@ -63,28 +64,28 @@ function initializeApiTester() {
             }
             initializeDefaultParams();
         }
-        
+
         // Update body section visibility
         updateBodySectionVisibility();
     }
-    
+
     // Set initial URL
     updateApiUrl();
-    
+
     // Update URL when endpoint changes
-    endpointSelect.addEventListener('change', function() {
+    endpointSelect.addEventListener('change', function () {
         updateApiUrl();
         updateBodySectionVisibility();
     });
-    
+
     // Initialize default parameters for sample transaction
     function initializeDefaultParams() {
         const tableBody = document.getElementById('params-table-body');
         if (!tableBody) return;
-        
+
         // Clear existing params
         tableBody.innerHTML = '';
-        
+
         // Default parameters for sample transaction
         const defaultParams = [
             { key: 'from_actor_id', value: '1' },
@@ -94,17 +95,17 @@ function initializeApiTester() {
             { key: 'payment_reference', value: '0' },
             { key: 'status', value: 'completed' }
         ];
-        
+
         defaultParams.forEach(param => {
             addParameterRow(param.key, param.value, false);
         });
     }
-    
+
     // Add parameter row
     function addParameterRow(key = '', value = '', isEditable = true) {
         const tableBody = document.getElementById('params-table-body');
         if (!tableBody) return;
-        
+
         const paramRow = document.createElement('tr');
         paramRow.className = 'param-row';
         paramRow.innerHTML = `
@@ -120,35 +121,35 @@ function initializeApiTester() {
                 </button>
             </td>
         `;
-        
+
         // Add remove functionality
-        paramRow.querySelector('.remove-param-btn').addEventListener('click', function() {
+        paramRow.querySelector('.remove-param-btn').addEventListener('click', function () {
             paramRow.remove();
         });
-        
+
         tableBody.appendChild(paramRow);
     }
-    
+
     // Setup add parameter button
     const addParamBtn = document.getElementById('add-param-btn');
     if (addParamBtn) {
-        addParamBtn.addEventListener('click', function() {
+        addParamBtn.addEventListener('click', function () {
             addParameterRow('', '', true); // Allow editing for manually added parameters
         });
     }
-    
+
     // Update method dropdown change handler
     if (methodSelect) {
-        methodSelect.addEventListener('change', function() {
+        methodSelect.addEventListener('change', function () {
             updateBodySectionVisibility();
         });
     }
-    
+
     // Function to update body section visibility
     function updateBodySectionVisibility() {
         const requestBodyTableSection = document.getElementById('request-body-table-section');
         const method = methodSelect.value;
-        
+
         if (method === 'POST' || method === 'PUT') {
             // Show parameter table for ALL POST/PUT requests
             if (requestBodyTableSection) {
@@ -168,18 +169,18 @@ function initializeApiTester() {
             if (requestBodySection) requestBodySection.style.display = 'none';
         }
     }
-    
+
     // Initialize parameters based on endpoint
     function initializeEndpointParams() {
         const tableBody = document.getElementById('params-table-body');
         if (!tableBody) return;
-        
+
         // Clear existing params
         tableBody.innerHTML = '';
-        
+
         const selectedEndpoint = endpointSelect.value;
         let params = [];
-        
+
         switch (selectedEndpoint) {
             case '/api/chain-actors':
                 params = [
@@ -236,12 +237,12 @@ function initializeApiTester() {
                     { key: 'value', value: '', description: 'Parameter value' }
                 ];
         }
-        
+
         params.forEach(param => {
             addParameterRow(param.key, param.value, false);
         });
     }
-    
+
     // Check if there are existing parameter rows
     function hasExistingParams() {
         const tableBody = document.getElementById('params-table-body');
@@ -254,7 +255,7 @@ function initializeTheme() {
     const savedTheme = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
     updateThemeIcon(savedTheme);
-    
+
     // Theme toggle event listener
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 }
@@ -262,7 +263,7 @@ function initializeTheme() {
 function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute('data-theme');
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    
+
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
     updateThemeIcon(newTheme);
@@ -278,26 +279,26 @@ function setupEventListeners() {
     // Hamburger menu toggle
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.querySelector('.sidebar');
-    
+
     if (sidebarToggle && sidebar) {
-        sidebarToggle.addEventListener('click', function(e) {
+        sidebarToggle.addEventListener('click', function (e) {
             e.preventDefault();
             sidebar.classList.toggle('show');
         });
-        
+
         // Close sidebar when clicking on a nav link
         document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', function() {
+            link.addEventListener('click', function () {
                 if (window.innerWidth < 768) {
                     sidebar.classList.remove('show');
                 }
             });
         });
     }
-    
+
     // Sidebar navigation
     document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', function(e) {
+        link.addEventListener('click', function (e) {
             e.preventDefault();
             const section = this.getAttribute('data-section');
             if (section) {
@@ -307,12 +308,12 @@ function setupEventListeners() {
     });
 
     // Add button
-    document.getElementById('add-btn').addEventListener('click', function() {
+    document.getElementById('add-btn').addEventListener('click', function () {
         openModal('add');
     });
 
     // Save button
-    document.getElementById('saveBtn').addEventListener('click', function() {
+    document.getElementById('saveBtn').addEventListener('click', function () {
         saveEntity();
     });
 
@@ -323,7 +324,7 @@ function setupEventListeners() {
 function setupSearchListeners() {
     const searchInputs = [
         'actors-search',
-        'seasons-search', 
+        'seasons-search',
         'batches-search',
         'milled-search',
         'transactions-search'
@@ -332,7 +333,7 @@ function setupSearchListeners() {
     searchInputs.forEach(inputId => {
         const input = document.getElementById(inputId);
         if (input) {
-            input.addEventListener('input', function() {
+            input.addEventListener('input', function () {
                 filterTable(this.value, inputId.replace('-search', ''));
             });
         }
@@ -364,13 +365,15 @@ function showSection(section) {
         'milled-rice': 'Milled Rice',
         'chain-transactions': 'Chain Transactions',
         'api-tester': 'API Tester',
-        'batch-tracker': 'Batch Tracker'
+        'batch-tracker': 'Batch Tracker',
+        'drying-data': 'Drying Data',
+        'transaction-summary': 'Transaction Summary'
     };
 
     document.getElementById('page-title').textContent = titles[section];
-    
+
     const addBtn = document.getElementById('add-btn');
-    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker' || section === 'chain-transactions') {
+    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker' || section === 'chain-transactions' || section === 'drying-data' || section === 'transaction-summary') {
         addBtn.style.display = 'none';
     } else {
         addBtn.style.display = 'block';
@@ -404,6 +407,13 @@ function showSection(section) {
             break;
         case 'batch-tracker':
             loadBatchTracker();
+            loadTransactionSummary();
+            break;
+        case 'drying-data':
+            loadDryingData();
+            break;
+        case 'transaction-summary':
+            loadTransactionSummary();
             break;
     }
 }
@@ -412,7 +422,7 @@ function showSection(section) {
 async function loadDashboard() {
     try {
         showLoading(true);
-        
+
         // Load counts for dashboard cards
         const [actorsData, batchesData, milledData, transactionsData, seasonsData] = await Promise.all([
             fetchData('/chain-actors').catch(() => ({ data: [] })),
@@ -434,7 +444,7 @@ async function loadDashboard() {
         document.getElementById('milled-count').textContent = milledCount;
         document.getElementById('transactions-count').textContent = transactionsCount;
         document.getElementById('seasons-count').textContent = seasonsCount;
-        
+
     } catch (error) {
         console.error('Error loading dashboard:', error);
         // Set default values on error
@@ -450,12 +460,28 @@ async function loadDashboard() {
 }
 
 // Data Loading Functions
-async function loadChainActors() {
+async function loadChainActors(page = 1) {
     try {
         showTableLoading('actors-tbody');
-        const response = await fetchData('/chain-actors');
-        currentData = response.data || [];
-        renderChainActorsTable(currentData);
+        const baseUrl = getApiUrl('/chain-actors');
+        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        // Handle paginated response
+        const actorsData = data.data.data || data.data || [];
+        const paginationInfo = data.data.current_page ? data.data : null;
+        
+        currentData = actorsData;
+        renderChainActorsTable(actorsData);
+        
+        // Render pagination if available
+        if (paginationInfo) {
+            renderActorsPagination(paginationInfo);
+        }
+        
+        // Setup search
+        setupActorsSearch();
     } catch (error) {
         console.error('Error loading chain actors:', error);
         showToast('Error loading chain actors', 'error');
@@ -463,14 +489,28 @@ async function loadChainActors() {
     }
 }
 
-async function loadProductionSeasons() {
+async function loadProductionSeasons(page = 1) {
     try {
         showTableLoading('seasons-tbody');
-        // Fetch from external API
-        const response = await fetch('https://digisaka.online/api/mobile/trace/season/get-all');
+        const baseUrl = getApiUrl('/production-seasons');
+        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const response = await fetch(url);
         const data = await response.json();
-        currentData = data.data || [];
-        renderProductionSeasonsTable(currentData);
+        
+        // Handle paginated response
+        const seasonsData = data.data.data || data.data || [];
+        const paginationInfo = data.data.current_page ? data.data : null;
+        
+        currentData = seasonsData;
+        renderProductionSeasonsTable(seasonsData);
+        
+        // Render pagination if available
+        if (paginationInfo) {
+            renderSeasonsPagination(paginationInfo);
+        }
+        
+        // Setup search
+        setupSeasonsSearch();
     } catch (error) {
         console.error('Error loading production seasons:', error);
         showToast('Error loading production seasons', 'error');
@@ -478,29 +518,32 @@ async function loadProductionSeasons() {
     }
 }
 
-async function loadRiceBatches() {
+async function loadRiceBatches(page = 1) {
     try {
         showTableLoading('batches-tbody');
-        const response = await fetchData('/rice-batches');
-        currentData = response.data || [];
-        renderRiceBatchesTable(currentData);
+        const baseUrl = getApiUrl('/rice-batches');
+        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        // Handle paginated response
+        const batchesData = data.data.data || data.data || [];
+        const paginationInfo = data.data.current_page ? data.data : null;
+        
+        currentData = batchesData;
+        renderRiceBatchesTable(batchesData);
+        
+        // Render pagination if available
+        if (paginationInfo) {
+            renderBatchesPagination(paginationInfo);
+        }
+        
+        // Setup search
+        setupBatchesSearch();
     } catch (error) {
         console.error('Error loading rice batches:', error);
         showToast('Error loading rice batches', 'error');
         showTableError('batches-tbody', 'Error loading rice batches');
-    }
-}
-
-async function loadMilledRice() {
-    try {
-        showTableLoading('milled-tbody');
-        const response = await fetchData('/milled-rice');
-        currentData = response.data || [];
-        renderMilledRiceTable(currentData);
-    } catch (error) {
-        console.error('Error loading milled rice:', error);
-        showToast('Error loading milled rice', 'error');
-        showTableError('milled-tbody', 'Error loading milled rice');
     }
 }
 
@@ -509,34 +552,34 @@ async function loadChainTransactions() {
         showTableLoading('transactions-tbody');
         const response = await fetchData('/transactions');
         transactionsPaginationState.allData = response.data || [];
-        
+
         console.log('Loaded transactions:', transactionsPaginationState.allData.length);
-        
+
         // Enrich transaction data with actor names
         const actorsResponse = await fetchData('/chain-actors');
         const actors = actorsResponse.data || [];
-        
+
         // Create actor lookup map
         const actorMap = {};
         actors.forEach(actor => {
             actorMap[actor.id] = actor.name;
         });
-        
+
         // Add actor names to transactions
         transactionsPaginationState.allData.forEach(transaction => {
             transaction.from_actor_name = actorMap[transaction.from_actor_id] || null;
             transaction.to_actor_name = actorMap[transaction.to_actor_id] || null;
         });
-        
+
         // Initialize filters and pagination
         transactionsPaginationState.currentPage = 1;
         applyTransactionFilters();
         renderTransactionFilters();
         renderTransactionPagination();
         renderChainTransactionsTable();
-        
+
         console.log('Rendered transactions. Filtered data:', transactionsPaginationState.filteredData.length);
-        
+
         // Setup header search and filter button
         setupTransactionHeaderControls();
     } catch (error) {
@@ -550,7 +593,7 @@ async function loadChainTransactions() {
 function setupTransactionHeaderControls() {
     const searchInput = document.getElementById('transactions-search-header');
     const filterBtn = document.getElementById('filter-toggle-btn-header');
-    
+
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             transactionsPaginationState.filters.searchTerm = e.target.value;
@@ -560,9 +603,10 @@ function setupTransactionHeaderControls() {
             renderChainTransactionsTable();
         });
     }
-    
+
     if (filterBtn) {
-        filterBtn.addEventListener('click', () => {
+        filterBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             const panel = document.getElementById('filters-panel');
             if (panel) {
                 const isHidden = panel.style.display === 'none' || panel.style.display === '';
@@ -578,6 +622,64 @@ function setupTransactionHeaderControls() {
     }
 }
 
+async function loadMilledRice(page = 1) {
+    try {
+        showTableLoading('milled-tbody');
+        const baseUrl = getApiUrl('/milled-rice');
+        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        // Handle paginated response
+        const milledData = data.data.data || data.data || [];
+        const paginationInfo = data.data.current_page ? data.data : null;
+        
+        currentData = milledData;
+        renderMilledRiceTable(milledData);
+        
+        // Render pagination if available
+        if (paginationInfo) {
+            renderMilledPagination(paginationInfo);
+        }
+        
+        // Setup search
+        setupMilledSearch();
+    } catch (error) {
+        console.error('Error loading milled rice:', error);
+        showToast('Error loading milled rice', 'error');
+        showTableError('milled-tbody', 'Error loading milled rice');
+    }
+}
+
+async function loadDryingData() {
+    try {
+        showTableLoading('drying-data-tbody');
+        const response = await fetchData('/drying-data');
+        currentData = response.data || [];
+        renderDryingDataTable(currentData);
+        setupDryingDataSearch();
+    } catch (error) {
+        console.error('Error loading drying data:', error);
+        showToast('Error loading drying data', 'error');
+        showTableError('drying-data-tbody', 'Error loading drying data');
+    }
+}
+
+async function loadTransactionSummary() {
+    try {
+        const container = document.getElementById('transaction-summary-tbody');
+        if (!container) return;
+        
+        showTableLoading('transaction-summary-tbody');
+        const response = await fetchData('/transaction/summary/all');
+        const data = response.data || [];
+        renderTransactionSummaryTable(data);
+    } catch (error) {
+        console.error('Error loading transaction summary:', error);
+        showToast('Error loading transaction summary', 'error');
+        showTableError('transaction-summary-tbody', 'Error loading transaction summary');
+    }
+}
 
 async function loadRecentTransactions() {
     const container = document.getElementById('recent-transactions');
@@ -591,20 +693,20 @@ async function loadRecentTransactions() {
                 <span class="text-muted">Loading recent transactions...</span>
             </div>
         `;
-        
+
         const response = await fetchData('/transactions');
         const transactions = response.data || [];
         renderRecentTransactions(transactions.slice(0, 5)); // Show only 5 most recent
     } catch (error) {
         console.error('Error loading recent transactions:', error);
-        container.innerHTML = 
+        container.innerHTML =
             '<div class="text-center text-muted"><i class="fas fa-exclamation-triangle"></i> Unable to load recent transactions</div>';
     }
 }
 
 function renderRecentTransactions(transactions) {
     const container = document.getElementById('recent-transactions');
-    
+
     if (!transactions || transactions.length === 0) {
         container.innerHTML = '<div class="text-center text-muted"><i class="fas fa-info-circle"></i> No recent transactions found</div>';
         return;
@@ -615,7 +717,7 @@ function renderRecentTransactions(transactions) {
         let paymentMethod = 'Cash';
         if (tx.payment_reference === 1) paymentMethod = 'Cheque';
         else if (tx.payment_reference === 2) paymentMethod = 'Balance';
-        
+
         return `
         <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
             <div>
@@ -639,26 +741,38 @@ function renderChainActorsTable(data) {
     tbody.innerHTML = '';
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No chain actors found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No chain actors found</td></tr>';
         return;
     }
 
     data.forEach(actor => {
         const row = document.createElement('tr');
+        const actorTypes = Array.isArray(actor.actor_type) ? actor.actor_type.join(', ') : actor.actor_type || '-';
+        const isActiveBadge = `<span class="badge ${actor.is_active ? 'bg-success' : 'bg-danger'}">${actor.is_active ? 'Active' : 'Inactive'}</span>`;
+        
+        // Parse address if it's a JSON string
+        let addressDisplay = '-';
+        try {
+            if (actor.address) {
+                const addressObj = typeof actor.address === 'string' ? JSON.parse(actor.address) : actor.address;
+                addressDisplay = addressObj.name || '-';
+            }
+        } catch (e) {
+            addressDisplay = actor.address || '-';
+        }
+        
         row.innerHTML = `
             <td>${actor.id}</td>
             <td>${actor.name}</td>
-            <td><span class="badge bg-primary">${actor.type}</span></td>
-            <td>${actor.contact_info || '-'}</td>
-            <td>${actor.location || '-'}</td>
-            <td>${actor.group || '-'}</td>
-            <td>${actor.farmer_id || '-'}</td>
+            <td>${actorTypes}</td>
+            <td>${actor.organization || '-'}</td>
+            <td>${actor.contact_number || '-'}</td>
+            <td>${addressDisplay}</td>
+            <td>₱${actor.balance || '0.00'}</td>
+            <td>${isActiveBadge}</td>
             <td class="action-buttons">
-                <button class="btn btn-sm btn-warning" onclick="editEntity('chain_actors', ${actor.id})">
+                <button class="btn btn-sm btn-warning" onclick="openChainActorModal('edit', ${actor.id})">
                     <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteEntity('chain_actors', ${actor.id})">
-                    <i class="fas fa-trash"></i>
                 </button>
             </td>
         `;
@@ -666,12 +780,198 @@ function renderChainActorsTable(data) {
     });
 }
 
+function renderActorsPagination(paginationInfo) {
+    const paginationContainer = document.getElementById('actors-pagination');
+    if (!paginationContainer) return;
+    
+    const currentPage = paginationInfo.current_page;
+    const lastPage = paginationInfo.last_page;
+    const total = paginationInfo.total;
+    const perPage = paginationInfo.per_page;
+    
+    // Generate page numbers to display (show up to 7 pages)
+    let pageNumbers = [];
+    if (lastPage <= 7) {
+        pageNumbers = Array.from({ length: lastPage }, (_, i) => i + 1);
+    } else {
+        // Always show first page, last page, and pages around current page
+        pageNumbers = [1];
+        const startPage = Math.max(2, currentPage - 2);
+        const endPage = Math.min(lastPage - 1, currentPage + 2);
+
+        if (startPage > 2) pageNumbers.push('...');
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(i);
+        }
+        if (endPage < lastPage - 1) pageNumbers.push('...');
+        pageNumbers.push(lastPage);
+    }
+
+    const html = `
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-muted fw-semibold">Show</small>
+                <select class="form-select form-select-sm" id="actors-per-page" style="width: auto;">
+                    <option value="10" ${perPage === 10 ? 'selected' : ''}>10</option>
+                    <option value="20" ${perPage === 20 ? 'selected' : ''}>20</option>
+                    <option value="50" ${perPage === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${perPage === 100 ? 'selected' : ''}>100</option>
+                </select>
+                <small class="text-muted fw-semibold">entries</small>
+            </div>
+            
+            <small class="text-muted">Showing ${total === 0 ? 0 : (currentPage - 1) * perPage + 1}-${Math.min(currentPage * perPage, total)} of ${total} actors</small>
+            
+            <nav aria-label="Actors pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeActorPage(1); return false;" title="First Page">
+                            <i class="fas fa-step-backward"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeActorPage(${currentPage - 1}); return false;" title="Previous Page">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    ${pageNumbers.map(pageNum => {
+        if (pageNum === '...') {
+            return `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        return `<li class="page-item ${pageNum === currentPage ? 'active' : ''}">
+                            <a class="page-link" href="#" onclick="changeActorPage(${pageNum}); return false;">${pageNum}</a>
+                        </li>`;
+    }).join('')}
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeActorPage(${currentPage + 1}); return false;" title="Next Page">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeActorPage(${lastPage}); return false;" title="Last Page">
+                            <i class="fas fa-step-forward"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    `;
+
+    paginationContainer.innerHTML = html;
+
+    // Attach event listener for items per page dropdown
+    const perPageSelect = document.getElementById('actors-per-page');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', (e) => {
+            loadChainActors(1); // Reset to first page when changing per_page
+        });
+    }
+}
+
+function setupActorsSearch() {
+    const searchInput = document.getElementById('actors-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterTable(e.target.value, 'actors');
+        });
+    }
+}
+
+function changeActorPage(page) {
+    loadChainActors(page);
+}
+
+function renderSeasonsPagination(paginationInfo) {
+    const paginationContainer = document.getElementById('seasons-pagination');
+    if (!paginationContainer) return;
+    
+    const currentPage = paginationInfo.current_page;
+    const lastPage = paginationInfo.last_page;
+    const total = paginationInfo.total;
+    const perPage = paginationInfo.per_page;
+    
+    // Generate page numbers to display (show up to 7 pages)
+    let pageNumbers = [];
+    if (lastPage <= 7) {
+        pageNumbers = Array.from({ length: lastPage }, (_, i) => i + 1);
+    } else {
+        pageNumbers = [1];
+        const startPage = Math.max(2, currentPage - 2);
+        const endPage = Math.min(lastPage - 1, currentPage + 2);
+        if (startPage > 2) pageNumbers.push('...');
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(i);
+        }
+        if (endPage < lastPage - 1) pageNumbers.push('...');
+        pageNumbers.push(lastPage);
+    }
+
+    const html = `
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-muted fw-semibold">Show</small>
+                <select class="form-select form-select-sm" id="seasons-per-page" style="width: auto;">
+                    <option value="10" ${perPage === 10 ? 'selected' : ''}>10</option>
+                    <option value="20" ${perPage === 20 ? 'selected' : ''}>20</option>
+                    <option value="50" ${perPage === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${perPage === 100 ? 'selected' : ''}>100</option>
+                </select>
+                <small class="text-muted fw-semibold">entries</small>
+            </div>
+            <small class="text-muted">Showing ${total === 0 ? 0 : (currentPage - 1) * perPage + 1}-${Math.min(currentPage * perPage, total)} of ${total} seasons</small>
+            <nav aria-label="Seasons pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeSeasonPage(1); return false;" title="First Page">
+                            <i class="fas fa-step-backward"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeSeasonPage(${currentPage - 1}); return false;" title="Previous Page">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    ${pageNumbers.map(pageNum => pageNum === '...' ? `<li class="page-item disabled"><span class="page-link">...</span></li>` : `<li class="page-item ${pageNum === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changeSeasonPage(${pageNum}); return false;">${pageNum}</a></li>`).join('')}
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeSeasonPage(${currentPage + 1}); return false;" title="Next Page">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeSeasonPage(${lastPage}); return false;" title="Last Page">
+                            <i class="fas fa-step-forward"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    `;
+    paginationContainer.innerHTML = html;
+    const perPageSelect = document.getElementById('seasons-per-page');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', () => loadProductionSeasons(1));
+    }
+}
+
+function setupSeasonsSearch() {
+    const searchInput = document.getElementById('seasons-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterTable(e.target.value, 'seasons');
+        });
+    }
+}
+
+function changeSeasonPage(page) {
+    loadProductionSeasons(page);
+}
+
 function renderProductionSeasonsTable(data) {
     const tbody = document.getElementById('seasons-tbody');
     tbody.innerHTML = '';
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No production seasons found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No production seasons found</td></tr>';
         return;
     }
 
@@ -680,16 +980,18 @@ function renderProductionSeasonsTable(data) {
         const carbonCertified = season.carbon_smart_certified === 1 || season.carbon_smart_certified === true;
         row.innerHTML = `
             <td>${season.id}</td>
+            <td>${season.farmer_id || '-'}</td>
             <td>${season.crop_year || '-'}</td>
             <td>${season.variety || '-'}</td>
             <td>${formatDate(season.planting_date)}</td>
             <td>${formatDate(season.harvest_date)}</td>
             <td>${season.total_yield_kg || '0'} kg</td>
+            <td>${season.moisture_content || '-'}%</td>
             <td><span class="badge ${carbonCertified ? 'bg-success' : 'bg-secondary'}">${carbonCertified ? 'Yes' : 'No'}</span></td>
             <td><span class="badge bg-${season.validation_status === 'pending' ? 'warning' : 'success'}">${season.validation_status || 'pending'}</span></td>
             <td class="action-buttons">
-                <button class="btn btn-sm btn-info" onclick="viewSeasonDetails(${season.id})">
-                    <i class="fas fa-eye"></i>
+                <button class="btn btn-sm btn-warning" onclick="editEntity('production_seasons', ${season.id})">
+                    <i class="fas fa-edit"></i>
                 </button>
             </td>
         `;
@@ -702,31 +1004,118 @@ function renderRiceBatchesTable(data) {
     tbody.innerHTML = '';
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No rice batches found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No rice batches found</td></tr>';
         return;
     }
 
     data.forEach(batch => {
         const row = document.createElement('tr');
+        const holderName = batch.current_holder?.name || '-';
+        const variety = batch.season?.variety || '-';
+        const statusBadge = `<span class="badge bg-${batch.status === 'for_sale' ? 'success' : batch.status === 'pending' ? 'warning' : 'secondary'}">${batch.status || '-'}</span>`;
+        
         row.innerHTML = `
             <td>${batch.id}</td>
-            <td>${batch.batch_number}</td>
-            <td>${batch.farmer_name || '-'}</td>
-            <td>${batch.rice_variety}</td>
-            <td>${formatDate(batch.harvest_date)}</td>
-            <td>${batch.quantity_harvested || '-'}</td>
-            <td>${batch.quality_grade || '-'}</td>
+            <td>${batch.qr_code ? batch.qr_code.substring(0, 8) + '...' : '-'}</td>
+            <td>${batch.batch_weight_kg || '-'} kg</td>
+            <td>${batch.moisture_content || '-'}%</td>
+            <td>${variety}</td>
+            <td>${holderName}</td>
+            <td>₱${batch.price_per_kg || '-'}</td>
+            <td>${statusBadge}</td>
             <td class="action-buttons">
                 <button class="btn btn-sm btn-warning" onclick="editEntity('rice_batches', ${batch.id})">
                     <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteEntity('rice_batches', ${batch.id})">
-                    <i class="fas fa-trash"></i>
                 </button>
             </td>
         `;
         tbody.appendChild(row);
     });
+}
+
+function renderBatchesPagination(paginationInfo) {
+    const paginationContainer = document.getElementById('batches-pagination');
+    if (!paginationContainer) return;
+    
+    const currentPage = paginationInfo.current_page;
+    const lastPage = paginationInfo.last_page;
+    const total = paginationInfo.total;
+    const perPage = paginationInfo.per_page;
+    
+    // Generate page numbers to display (show up to 7 pages)
+    let pageNumbers = [];
+    if (lastPage <= 7) {
+        pageNumbers = Array.from({ length: lastPage }, (_, i) => i + 1);
+    } else {
+        pageNumbers = [1];
+        const startPage = Math.max(2, currentPage - 2);
+        const endPage = Math.min(lastPage - 1, currentPage + 2);
+        if (startPage > 2) pageNumbers.push('...');
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(i);
+        }
+        if (endPage < lastPage - 1) pageNumbers.push('...');
+        pageNumbers.push(lastPage);
+    }
+
+    const html = `
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-muted fw-semibold">Show</small>
+                <select class="form-select form-select-sm" id="batches-per-page" style="width: auto;">
+                    <option value="10" ${perPage === 10 ? 'selected' : ''}>10</option>
+                    <option value="20" ${perPage === 20 ? 'selected' : ''}>20</option>
+                    <option value="50" ${perPage === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${perPage === 100 ? 'selected' : ''}>100</option>
+                </select>
+                <small class="text-muted fw-semibold">entries</small>
+            </div>
+            <small class="text-muted">Showing ${total === 0 ? 0 : (currentPage - 1) * perPage + 1}-${Math.min(currentPage * perPage, total)} of ${total} batches</small>
+            <nav aria-label="Batches pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeBatchPage(1); return false;" title="First Page">
+                            <i class="fas fa-step-backward"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeBatchPage(${currentPage - 1}); return false;" title="Previous Page">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    ${pageNumbers.map(pageNum => pageNum === '...' ? `<li class="page-item disabled"><span class="page-link">...</span></li>` : `<li class="page-item ${pageNum === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changeBatchPage(${pageNum}); return false;">${pageNum}</a></li>`).join('')}
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeBatchPage(${currentPage + 1}); return false;" title="Next Page">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeBatchPage(${lastPage}); return false;" title="Last Page">
+                            <i class="fas fa-step-forward"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    `;
+    paginationContainer.innerHTML = html;
+    const perPageSelect = document.getElementById('batches-per-page');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', () => loadRiceBatches(1));
+    }
+}
+
+function setupBatchesSearch() {
+    const searchInput = document.getElementById('batches-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterTable(e.target.value, 'batches');
+        });
+    }
+}
+
+function changeBatchPage(page) {
+    loadRiceBatches(page);
 }
 
 function renderMilledRiceTable(data) {
@@ -739,30 +1128,108 @@ function renderMilledRiceTable(data) {
     }
 
     data.forEach(milled => {
-        const yieldPercentage = milled.input_quantity && milled.output_quantity 
-            ? ((milled.output_quantity / milled.input_quantity) * 100).toFixed(2)
-            : '-';
-            
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${milled.id}</td>
-            <td>${milled.batch_number || '-'}</td>
-            <td>${milled.miller_name || '-'}</td>
-            <td>${formatDate(milled.milling_date)}</td>
-            <td>${milled.input_quantity || '-'}</td>
-            <td>${milled.output_quantity || '-'}</td>
-            <td>${yieldPercentage}%</td>
+            <td>${milled.farmer_id || '-'}</td>
+            <td>${milled.total_weight_kg || '-'} kg</td>
+            <td>${milled.milling_type || '-'}</td>
+            <td>${milled.quality || '-'}</td>
+            <td>${milled.moisture || '-'}%</td>
+            <td>${milled.total_weight_processed_kg || '-'} kg</td>
             <td class="action-buttons">
                 <button class="btn btn-sm btn-warning" onclick="editEntity('milled_rice', ${milled.id})">
                     <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteEntity('milled_rice', ${milled.id})">
-                    <i class="fas fa-trash"></i>
                 </button>
             </td>
         `;
         tbody.appendChild(row);
     });
+}
+
+function renderMilledPagination(paginationInfo) {
+    const paginationContainer = document.getElementById('milled-pagination');
+    if (!paginationContainer) return;
+    
+    const currentPage = paginationInfo.current_page;
+    const lastPage = paginationInfo.last_page;
+    const total = paginationInfo.total;
+    const perPage = paginationInfo.per_page;
+    
+    // Generate page numbers to display (show up to 7 pages)
+    let pageNumbers = [];
+    if (lastPage <= 7) {
+        pageNumbers = Array.from({ length: lastPage }, (_, i) => i + 1);
+    } else {
+        pageNumbers = [1];
+        const startPage = Math.max(2, currentPage - 2);
+        const endPage = Math.min(lastPage - 1, currentPage + 2);
+        if (startPage > 2) pageNumbers.push('...');
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(i);
+        }
+        if (endPage < lastPage - 1) pageNumbers.push('...');
+        pageNumbers.push(lastPage);
+    }
+
+    const html = `
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-muted fw-semibold">Show</small>
+                <select class="form-select form-select-sm" id="milled-per-page" style="width: auto;">
+                    <option value="10" ${perPage === 10 ? 'selected' : ''}>10</option>
+                    <option value="20" ${perPage === 20 ? 'selected' : ''}>20</option>
+                    <option value="50" ${perPage === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${perPage === 100 ? 'selected' : ''}>100</option>
+                </select>
+                <small class="text-muted fw-semibold">entries</small>
+            </div>
+            <small class="text-muted">Showing ${total === 0 ? 0 : (currentPage - 1) * perPage + 1}-${Math.min(currentPage * perPage, total)} of ${total} records</small>
+            <nav aria-label="Milled pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeMilledPage(1); return false;" title="First Page">
+                            <i class="fas fa-step-backward"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeMilledPage(${currentPage - 1}); return false;" title="Previous Page">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    ${pageNumbers.map(pageNum => pageNum === '...' ? `<li class="page-item disabled"><span class="page-link">...</span></li>` : `<li class="page-item ${pageNum === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changeMilledPage(${pageNum}); return false;">${pageNum}</a></li>`).join('')}
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeMilledPage(${currentPage + 1}); return false;" title="Next Page">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeMilledPage(${lastPage}); return false;" title="Last Page">
+                            <i class="fas fa-step-forward"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    `;
+    paginationContainer.innerHTML = html;
+    const perPageSelect = document.getElementById('milled-per-page');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', () => loadMilledRice(1));
+    }
+}
+
+function setupMilledSearch() {
+    const searchInput = document.getElementById('milled-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterTable(e.target.value, 'milled');
+        });
+    }
+}
+
+function changeMilledPage(page) {
+    loadMilledRice(page);
 }
 
 function renderChainTransactionsTable() {
@@ -771,7 +1238,7 @@ function renderChainTransactionsTable() {
 
     const data = transactionsPaginationState.filteredData;
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No chain transactions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No chain transactions found</td></tr>';
         return;
     }
 
@@ -784,24 +1251,24 @@ function renderChainTransactionsTable() {
 
     paginatedData.forEach(transaction => {
         const row = document.createElement('tr');
-        
+
         // Display batch IDs without links
         let batchDisplay = '-';
         if (transaction.batch_ids && transaction.batch_ids.length > 0) {
             batchDisplay = transaction.batch_ids.join(', ');
         }
-        
+
         // Show real actor IDs with hyperlinks to digisaka.app
         const fromActorId = transaction.from_actor_id || '-';
         const toActorId = transaction.to_actor_id || '-';
-        
-        const fromActorDisplay = fromActorId !== '-' 
-            ? `<a href="https://digisaka.app/api/mobile/trace/chain-actor/${fromActorId}" target="_blank" class="text-decoration-none">${fromActorId}</a>`
+
+        const fromActorDisplay = fromActorId !== '-'
+            ? `<a href="https://digisaka.app/api/mobile/trace/actor/get-by-farmer/${fromActorId}" target="_blank" class="text-decoration-none">${fromActorId}</a>`
             : '-';
         const toActorDisplay = toActorId !== '-'
-            ? `<a href="https://digisaka.app/api/mobile/trace/chain-actor/${toActorId}" target="_blank" class="text-decoration-none">${toActorId}</a>`
+            ? `<a href="https://digisaka.app/api/mobile/trace/actor/get-by-farmer/${toActorId}" target="_blank" class="text-decoration-none">${toActorId}</a>`
             : '-';
-        
+
         // Format payment reference
         let paymentRef = 'Cash';
         if (transaction.payment_reference === 1) {
@@ -809,16 +1276,9 @@ function renderChainTransactionsTable() {
         } else if (transaction.payment_reference === 2) {
             paymentRef = 'Balance';
         }
-        
+
         // Format moisture
         const moistureDisplay = transaction.moisture || '-';
-        
-        // Add JSON data display for transparency
-        const jsonDataDisplay = transaction.json_data ? 
-            `<button class="btn btn-sm btn-info" onclick="showJsonData('${transaction.publicKey}', '${encodeURIComponent(transaction.json_data)}')" title="View Raw JSON Data">
-                <i class="fas fa-code"></i> JSON
-            </button>` : 
-            `<span class="badge bg-warning">Binary</span>`;
 
         // Convert status number to readable string
         let statusDisplay = transaction.status;
@@ -826,7 +1286,7 @@ function renderChainTransactionsTable() {
             const statusMap = { 0: 'Cancelled', 1: 'Completed', 2: 'Pending' };
             statusDisplay = statusMap[transaction.status] || 'Unknown';
         }
-        
+
         row.innerHTML = `
             <td>${batchDisplay}</td>
             <td>${fromActorDisplay}</td>
@@ -837,7 +1297,6 @@ function renderChainTransactionsTable() {
             <td>${moistureDisplay}</td>
             <td>${formatDate(transaction.transaction_date)}</td>
             <td><span class="badge ${getStatusBadgeClass(transaction.status)}">${statusDisplay}</span></td>
-            <td>${jsonDataDisplay}</td>
             <td>
                 ${transaction.signature ? `<a href="https://explorer.solana.com/tx/${transaction.signature}?cluster=devnet" target="_blank" class="btn btn-sm btn-outline-primary" title="View on Solana Explorer">
                     <i class="fas fa-external-link-alt"></i>
@@ -845,7 +1304,7 @@ function renderChainTransactionsTable() {
             </td>
         `;
         tbody.appendChild(row);
-        
+
         // Add click handlers for actor links after row is added to DOM
         const fromLink = row.querySelector('td:nth-child(2) a');
         const toLink = row.querySelector('td:nth-child(3) a');
@@ -868,24 +1327,24 @@ function renderChainTransactionsTable() {
 function applyTransactionFilters() {
     const allData = transactionsPaginationState.allData;
     const filters = transactionsPaginationState.filters;
-    
+
     transactionsPaginationState.filteredData = allData.filter(transaction => {
         // Filter by status
         if (filters.status && transaction.status !== filters.status) {
             return false;
         }
-        
+
         // Filter by payment method
         if (filters.paymentMethod) {
             let paymentRef = 'Cash';
             if (transaction.payment_reference === 1) paymentRef = 'Cheque';
             else if (transaction.payment_reference === 2) paymentRef = 'Balance';
-            
+
             if (paymentRef !== filters.paymentMethod) {
                 return false;
             }
         }
-        
+
         // Filter by date range
         if (filters.dateFrom || filters.dateTo) {
             const txDate = new Date(transaction.transaction_date);
@@ -899,19 +1358,19 @@ function applyTransactionFilters() {
                 if (txDate > toDate) return false;
             }
         }
-        
+
         // Filter by moisture range
         const moisture = parseFloat(transaction.moisture) || 0;
         if (moisture < filters.moistureMin || moisture > filters.moistureMax) {
             return false;
         }
-        
+
         // Filter by quantity range
         const quantity = parseFloat(transaction.quantity) || 0;
         if (quantity < filters.quantityMin || quantity > filters.quantityMax) {
             return false;
         }
-        
+
         // Filter by search term (searches in actor names, batch IDs, etc.)
         if (filters.searchTerm) {
             const searchLower = filters.searchTerm.toLowerCase();
@@ -921,15 +1380,15 @@ function applyTransactionFilters() {
                 ${transaction.batch_ids ? transaction.batch_ids.join(' ') : ''}
                 ${transaction.quantity || ''}
             `.toLowerCase();
-            
+
             if (!searchableText.includes(searchLower)) {
                 return false;
             }
         }
-        
+
         return true;
     });
-    
+
     // Reset to first page when filters change
     transactionsPaginationState.currentPage = 1;
 }
@@ -938,7 +1397,7 @@ function applyTransactionFilters() {
 function renderTransactionFilters() {
     const container = document.getElementById('transactions-filters-container');
     if (!container) return;
-    
+
     const html = `
         <div id="filters-panel" class="card mb-3" style="display: none;">
             <div class="card-body">
@@ -1015,9 +1474,9 @@ function renderTransactionFilters() {
             </div>
         </div>
     `;
-    
+
     container.innerHTML = html;
-    
+
     // Attach event listeners
     document.getElementById('transactions-status-filter').addEventListener('change', (e) => {
         transactionsPaginationState.filters.status = e.target.value;
@@ -1026,7 +1485,7 @@ function renderTransactionFilters() {
         renderTransactionPagination();
         renderChainTransactionsTable();
     });
-    
+
     document.getElementById('transactions-payment-filter').addEventListener('change', (e) => {
         transactionsPaginationState.filters.paymentMethod = e.target.value;
         applyTransactionFilters();
@@ -1034,7 +1493,7 @@ function renderTransactionFilters() {
         renderTransactionPagination();
         renderChainTransactionsTable();
     });
-    
+
     document.getElementById('transactions-date-from').addEventListener('change', (e) => {
         transactionsPaginationState.filters.dateFrom = e.target.value;
         applyTransactionFilters();
@@ -1042,7 +1501,7 @@ function renderTransactionFilters() {
         renderTransactionPagination();
         renderChainTransactionsTable();
     });
-    
+
     document.getElementById('transactions-date-to').addEventListener('change', (e) => {
         transactionsPaginationState.filters.dateTo = e.target.value;
         applyTransactionFilters();
@@ -1050,12 +1509,12 @@ function renderTransactionFilters() {
         renderTransactionPagination();
         renderChainTransactionsTable();
     });
-    
+
     // Moisture range sliders
     const moistureMin = document.getElementById('transactions-moisture-min');
     const moistureMax = document.getElementById('transactions-moisture-max');
     const moistureValue = document.getElementById('moisture-value');
-    
+
     moistureMin.addEventListener('input', (e) => {
         if (parseInt(e.target.value) > parseInt(moistureMax.value)) {
             moistureMax.value = e.target.value;
@@ -1067,7 +1526,7 @@ function renderTransactionFilters() {
         renderTransactionPagination();
         renderChainTransactionsTable();
     });
-    
+
     moistureMax.addEventListener('input', (e) => {
         if (parseInt(e.target.value) < parseInt(moistureMin.value)) {
             moistureMin.value = e.target.value;
@@ -1079,12 +1538,12 @@ function renderTransactionFilters() {
         renderTransactionPagination();
         renderChainTransactionsTable();
     });
-    
+
     // Quantity range sliders
     const quantityMin = document.getElementById('transactions-quantity-min');
     const quantityMax = document.getElementById('transactions-quantity-max');
     const quantityValue = document.getElementById('quantity-value');
-    
+
     quantityMin.addEventListener('input', (e) => {
         if (parseInt(e.target.value) > parseInt(quantityMax.value)) {
             quantityMax.value = e.target.value;
@@ -1096,7 +1555,7 @@ function renderTransactionFilters() {
         renderTransactionPagination();
         renderChainTransactionsTable();
     });
-    
+
     quantityMax.addEventListener('input', (e) => {
         if (parseInt(e.target.value) < parseInt(quantityMin.value)) {
             quantityMin.value = e.target.value;
@@ -1108,7 +1567,7 @@ function renderTransactionFilters() {
         renderTransactionPagination();
         renderChainTransactionsTable();
     });
-    
+
     // Clear filters button
     document.getElementById('clear-filters-btn').addEventListener('click', () => {
         transactionsPaginationState.filters = {
@@ -1135,22 +1594,22 @@ function renderTransactionFilters() {
 function renderTransactionPagination() {
     const container = document.getElementById('transactions-pagination-container');
     if (!container) return;
-    
+
     const totalItems = transactionsPaginationState.filteredData.length;
     const itemsPerPage = transactionsPaginationState.itemsPerPage;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     const currentPage = transactionsPaginationState.currentPage;
-    
+
     // Generate page numbers to display (show up to 7 pages)
     let pageNumbers = [];
     if (totalPages <= 7) {
-        pageNumbers = Array.from({length: totalPages}, (_, i) => i + 1);
+        pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
     } else {
         // Always show first page, last page, and pages around current page
         pageNumbers = [1];
         const startPage = Math.max(2, currentPage - 2);
         const endPage = Math.min(totalPages - 1, currentPage + 2);
-        
+
         if (startPage > 2) pageNumbers.push('...');
         for (let i = startPage; i <= endPage; i++) {
             pageNumbers.push(i);
@@ -1158,7 +1617,7 @@ function renderTransactionPagination() {
         if (endPage < totalPages - 1) pageNumbers.push('...');
         pageNumbers.push(totalPages);
     }
-    
+
     const html = `
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
             <div class="d-flex align-items-center gap-2">
@@ -1187,13 +1646,13 @@ function renderTransactionPagination() {
                         </a>
                     </li>
                     ${pageNumbers.map(pageNum => {
-                        if (pageNum === '...') {
-                            return `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-                        }
-                        return `<li class="page-item ${pageNum === currentPage ? 'active' : ''}">
+        if (pageNum === '...') {
+            return `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        return `<li class="page-item ${pageNum === currentPage ? 'active' : ''}">
                             <a class="page-link" href="#" onclick="changeTransactionPage(${pageNum}); return false;">${pageNum}</a>
                         </li>`;
-                    }).join('')}
+    }).join('')}
                     <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
                         <a class="page-link" href="#" onclick="changeTransactionPage(${currentPage + 1}); return false;" title="Next Page">
                             <i class="fas fa-chevron-right"></i>
@@ -1208,9 +1667,9 @@ function renderTransactionPagination() {
             </nav>
         </div>
     `;
-    
+
     container.innerHTML = html;
-    
+
     // Attach event listener for items per page dropdown
     const perPageSelect = document.getElementById('transactions-per-page-bottom');
     if (perPageSelect) {
@@ -1238,7 +1697,7 @@ function changeTransactionPage(pageNum) {
 // Show JSON Data Modal
 function showJsonData(publicKey, encodedJsonData) {
     const jsonData = decodeURIComponent(encodedJsonData);
-    
+
     // Create modal HTML
     const modalHtml = `
         <div class="modal fade" id="jsonDataModal" tabindex="-1" aria-labelledby="jsonDataModalLabel" aria-hidden="true">
@@ -1279,22 +1738,22 @@ function showJsonData(publicKey, encodedJsonData) {
             </div>
         </div>
     `;
-    
+
     // Remove existing modal if any
     const existingModal = document.getElementById('jsonDataModal');
     if (existingModal) {
         existingModal.remove();
     }
-    
+
     // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
+
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('jsonDataModal'));
     modal.show();
-    
+
     // Clean up modal after it's hidden
-    document.getElementById('jsonDataModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('jsonDataModal').addEventListener('hidden.bs.modal', function () {
         this.remove();
     });
 }
@@ -1313,73 +1772,359 @@ function copyToClipboard(text) {
 async function openModal(mode, entityType = null, id = null) {
     isEditing = mode === 'edit';
     editingId = id;
-    
+
     const modal = new bootstrap.Modal(document.getElementById('entityModal'));
     const modalTitle = document.getElementById('modalTitle');
     const formFields = document.getElementById('formFields');
-    
+
     modalTitle.textContent = isEditing ? 'Edit ' + getCurrentEntityDisplayName() : 'Add New ' + getCurrentEntityDisplayName();
-    
+
     // Load dynamic options for all forms that need them
     await loadFormOptions();
-    
+
     // Generate form fields based on current entity
     formFields.innerHTML = generateFormFields(currentEntity);
-    
+
     // If editing, populate form with existing data
     if (isEditing && id) {
         populateForm(id);
     }
-    
+
     modal.show();
 }
 
-// Setup event listeners for dynamic fields
-function setupDynamicFieldListeners() {
-    // Multiselect dropdowns
-    document.querySelectorAll('.multiselect-dropdown').forEach(dropdown => {
-        dropdown.addEventListener('change', function() {
-            if (this.value) {
-                addChip(this.id.replace('_dropdown', ''), this.value, this.options[this.selectedIndex].text);
-                this.value = '';
-            }
-        });
-    });
-    
-    // Chips input fields
-    document.querySelectorAll('.chips-input').forEach(input => {
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && this.value.trim()) {
-                e.preventDefault();
-                addChip(this.id.replace('_input', ''), this.value.trim(), this.value.trim());
-                this.value = '';
-            }
-        });
-    });
+// Chain Actor Add/Edit Modal - NEW IMPLEMENTATION
+async function openChainActorModal(mode, id = null) {
+    isEditing = mode === 'edit';
+    editingId = id;
+
+    const modal = new bootstrap.Modal(document.getElementById('chainActorModal'));
+    const modalTitle = document.getElementById('chainActorModalTitle');
+    const formFields = document.getElementById('chainActorFormFields');
+
+    modalTitle.textContent = isEditing ? 'Edit Chain Actor' : 'Add New Chain Actor';
+
+    // Generate form fields
+    formFields.innerHTML = generateChainActorFormFields();
+
+    // Setup event listeners for type dropdown
+    setupChainActorFormListeners();
+
+    // If editing, populate form with existing data
+    if (isEditing && id) {
+        await populateChainActorForm(id);
+    }
+
+    modal.show();
 }
 
-// Add chip to multiselect or chips field
-function addChip(fieldName, value, label) {
-    const chipsContainer = document.getElementById(`${fieldName}_chips`);
-    const hiddenInput = document.getElementById(fieldName);
+function generateChainActorFormFields() {
+    return `
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="actor_name" class="form-label">Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="actor_name" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="actor_contact_number" class="form-label">Contact Number</label>
+                <input type="text" class="form-control" id="actor_contact_number">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="actor_type" class="form-label">Type <span class="text-danger">*</span></label>
+                <div id="actor_type_chips" class="mb-2"></div>
+                <select class="form-select" id="actor_type_dropdown">
+                    <option value="">Add Type</option>
+                    <option value="farmer">Farmer</option>
+                    <option value="miller">Miller</option>
+                    <option value="distributor">Distributor</option>
+                    <option value="retailer">Retailer</option>
+                    <option value="validator">Validator</option>
+                </select>
+                <input type="hidden" id="actor_type" value="">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="actor_location" class="form-label">Location</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="actor_location" placeholder="Click to select location">
+                    <button class="btn btn-outline-secondary" type="button" id="actor_location_picker">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="actor_group" class="form-label">Group</label>
+                <select class="form-select" id="actor_group">
+                    <option value="">Select Group</option>
+                    <option value="blo">BLO</option>
+                    <option value="coop">Cooperative</option>
+                    <option value="buyback">Buyback</option>
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="actor_farmer_id" class="form-label">Farmer ID</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="actor_farmer_id" placeholder="Search farmer...">
+                    <button class="btn btn-outline-secondary" type="button" id="actor_farmer_id_search">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div id="actor_farmer_id_dropdown" class="dropdown-menu" style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 1000;">
+                    <!-- Search results will be populated here -->
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="actor_assign_tps" class="form-label">Assign TPS</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="actor_assign_tps" placeholder="Search TPS...">
+                    <button class="btn btn-outline-secondary" type="button" id="actor_assign_tps_search">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div id="actor_assign_tps_dropdown" class="dropdown-menu" style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 1000;">
+                    <!-- Search results will be populated here -->
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="actor_is_active" checked>
+                    <label class="form-check-label" for="actor_is_active">
+                        Active
+                    </label>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function populateChainActorForm(id) {
+    // Get actor from current data (already loaded)
+    const actor = currentData.find(item => item.id == id);
     
+    if (!actor) {
+        console.warn(`Actor with id ${id} not found in current data`);
+        return;
+    }
+    
+    // Safely set form values with fallback
+    const nameEl = document.getElementById('actor_name');
+    if (nameEl) nameEl.value = actor.name || '';
+    
+    const contactEl = document.getElementById('actor_contact_number');
+    if (contactEl) contactEl.value = actor.contact_number || '';
+    
+    const locationEl = document.getElementById('actor_location');
+    if (locationEl) locationEl.value = actor.location || '';
+    
+    const groupEl = document.getElementById('actor_group');
+    if (groupEl) groupEl.value = actor.group || '';
+    
+    const farmerIdEl = document.getElementById('actor_farmer_id');
+    if (farmerIdEl) farmerIdEl.value = actor.farmer_id || '';
+    
+    const assignTpsEl = document.getElementById('actor_assign_tps');
+    if (assignTpsEl) assignTpsEl.value = actor.assign_tps || '';
+    
+    const activeEl = document.getElementById('actor_is_active');
+    if (activeEl) activeEl.checked = actor.is_active !== false;
+    
+    // Handle actor types
+    if (actor.actor_type) {
+        const types = Array.isArray(actor.actor_type) ? actor.actor_type : actor.actor_type.split(',');
+        types.forEach(type => {
+            addChainActorChip(type.trim(), type.trim());
+        });
+    }
+}
+
+function addChainActorChip(value, label) {
+    const chipsContainer = document.getElementById('actor_type_chips');
+    const hiddenInput = document.getElementById('actor_type');
+
     // Check if chip already exists
     if (chipsContainer.querySelector(`[data-value="${value}"]`)) {
         return;
     }
-    
+
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.setAttribute('data-value', value);
     chip.innerHTML = `
         ${label}
-        <button type="button" class="chip-remove" onclick="removeChip('${fieldName}', '${value}')">
+        <button type="button" class="chip-remove" onclick="removeChainActorChip('${value}')">
             ×
         </button>
     `;
-    
+
     chipsContainer.appendChild(chip);
-    updateHiddenInput(fieldName);
+    updateChainActorHiddenInput();
+}
+
+function removeChainActorChip(value) {
+    const chip = document.querySelector(`#actor_type_chips [data-value="${value}"]`);
+    if (chip) {
+        chip.remove();
+        updateChainActorHiddenInput();
+    }
+}
+
+function updateChainActorHiddenInput() {
+    const chipsContainer = document.getElementById('actor_type_chips');
+    const hiddenInput = document.getElementById('actor_type');
+    const values = Array.from(chipsContainer.querySelectorAll('.chip')).map(chip => chip.getAttribute('data-value'));
+    hiddenInput.value = values.join(',');
+}
+
+function setupChainActorFormListeners() {
+    // Type dropdown listener
+    const typeDropdown = document.getElementById('actor_type_dropdown');
+    if (typeDropdown) {
+        typeDropdown.addEventListener('change', function () {
+            if (this.value) {
+                addChainActorChip(this.value, this.options[this.selectedIndex].text);
+                this.value = '';
+            }
+        });
+    }
+
+    // Farmer ID search
+    const farmerIdInput = document.getElementById('actor_farmer_id');
+    const farmerIdSearchBtn = document.getElementById('actor_farmer_id_search');
+    if (farmerIdInput && farmerIdSearchBtn) {
+        farmerIdSearchBtn.addEventListener('click', () => searchUsers(farmerIdInput.value, 'actor_farmer_id_dropdown', 'actor_farmer_id'));
+        farmerIdInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                searchUsers(farmerIdInput.value, 'actor_farmer_id_dropdown', 'actor_farmer_id');
+            }
+        });
+    }
+
+    // Assign TPS search
+    const assignTpsInput = document.getElementById('actor_assign_tps');
+    const assignTpsSearchBtn = document.getElementById('actor_assign_tps_search');
+    if (assignTpsInput && assignTpsSearchBtn) {
+        assignTpsSearchBtn.addEventListener('click', () => searchUsers(assignTpsInput.value, 'actor_assign_tps_dropdown', 'actor_assign_tps'));
+        assignTpsInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                searchUsers(assignTpsInput.value, 'actor_assign_tps_dropdown', 'actor_assign_tps');
+            }
+        });
+    }
+}
+
+async function searchUsers(query, dropdownId, inputId) {
+    if (!query || query.trim().length < 2) {
+        showToast('Please enter at least 2 characters', 'warning');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_EXTERNAL_URL}/api/mobile/get-all-users/${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        const dropdown = document.getElementById(dropdownId);
+        if (!dropdown) return;
+
+        if (data.success && data.data && Array.isArray(data.data)) {
+            dropdown.innerHTML = '';
+            data.data.forEach(user => {
+                const item = document.createElement('div');
+                item.className = 'dropdown-item';
+                item.style.cursor = 'pointer';
+                
+                // Extract name from nested user object or use direct name property
+                let displayName = user.name;
+                let userId = user.id || user.user_id;
+                
+                if (!displayName && user.user) {
+                    const firstName = user.user.first_name || '';
+                    const lastName = user.user.last_name || '';
+                    displayName = `${firstName} ${lastName}`.trim();
+                }
+                
+                item.innerHTML = `${displayName || userId}`;
+                item.addEventListener('click', () => {
+                    const inputEl = document.getElementById(inputId);
+                    inputEl.value = userId;
+                    dropdown.style.display = 'none';
+                });
+                dropdown.appendChild(item);
+            });
+            dropdown.style.display = 'block';
+        } else {
+            dropdown.innerHTML = '<div class="dropdown-item text-muted">No results found</div>';
+            dropdown.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error searching users:', error);
+        showToast('Error searching users', 'error');
+    }
+}
+
+async function saveChainActor() {
+    try {
+        // Validate required fields
+        const name = document.getElementById('actor_name').value.trim();
+        const type = document.getElementById('actor_type').value.trim();
+
+        if (!name) {
+            showToast('Name is required', 'error');
+            return;
+        }
+
+        if (!type) {
+            showToast('At least one type is required', 'error');
+            return;
+        }
+
+        // Collect form data
+        const formData = {
+            name: name,
+            actor_type: type.split(',').filter(t => t.trim()),
+            contact_number: document.getElementById('actor_contact_number').value || null,
+            location: document.getElementById('actor_location').value || null,
+            group: document.getElementById('actor_group').value || null,
+            farmer_id: document.getElementById('actor_farmer_id').value || null,
+            assign_tps: document.getElementById('actor_assign_tps').value || null,
+            is_active: document.getElementById('actor_is_active').checked
+        };
+
+        showLoading(true);
+
+        // Call external API upsert endpoint
+        const endpoint = isEditing ? `/actor/upsert/${editingId}` : '/actor/upsert';
+        const response = await fetch(`${API_EXTERNAL_URL}/api/mobile/trace${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast(isEditing ? 'Actor updated successfully' : 'Actor created successfully', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('chainActorModal')).hide();
+            
+            // Reload chain actors table
+            loadChainActors();
+        } else {
+            showToast(result.message || 'Operation failed', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving chain actor:', error);
+        showToast('Error saving chain actor', 'error');
+    } finally {
+        showLoading(false);
+    }
 }
 
 // Remove chip
@@ -1442,7 +2187,7 @@ async function loadFormOptions() {
         };
 
         console.log('Form options loaded:', transactionFormOptions);
-        
+
     } catch (error) {
         console.error('Error loading transaction form options:', error);
     }
@@ -1451,14 +2196,14 @@ async function loadFormOptions() {
 function generateFormFields(entityType) {
     const fields = getEntityFields(entityType);
     let html = '';
-    
+
     // Group fields in pairs for better layout
     for (let i = 0; i < fields.length; i += 2) {
         const field1 = fields[i];
         const field2 = fields[i + 1];
-        
+
         html += '<div class="row">';
-        
+
         // First field
         html += `
             <div class="col-md-${field2 ? '6' : '12'} mb-3">
@@ -1466,7 +2211,7 @@ function generateFormFields(entityType) {
                 ${generateFieldInput(field1)}
             </div>
         `;
-        
+
         // Second field if exists
         if (field2) {
             html += `
@@ -1476,15 +2221,10 @@ function generateFormFields(entityType) {
                 </div>
             `;
         }
-        
+
         html += '</div>';
     }
-    
-    // Add event listeners for dynamic fields after modal is shown
-    setTimeout(() => {
-        setupDynamicFieldListeners();
-    }, 100);
-    
+
     return html;
 }
 
@@ -1540,22 +2280,24 @@ function getEntityFields(entityType) {
     const fieldDefinitions = {
         'chain_actors': [
             { name: 'name', label: 'Name', type: 'text', required: true },
-            { name: 'type', label: 'Type', type: 'multiselect', required: true, 
-              options: [
-                  { value: 'farmer', label: 'Farmer' },
-                  { value: 'miller', label: 'Miller' },
-                  { value: 'distributor', label: 'Distributor' },
-                  { value: 'retailer', label: 'Retailer' },
-                  { value: 'validator', label: 'Validator' }
-              ]
+            {
+                name: 'type', label: 'Type', type: 'multiselect', required: true,
+                options: [
+                    { value: 'farmer', label: 'Farmer' },
+                    { value: 'miller', label: 'Miller' },
+                    { value: 'distributor', label: 'Distributor' },
+                    { value: 'retailer', label: 'Retailer' },
+                    { value: 'validator', label: 'Validator' }
+                ]
             },
             { name: 'location', label: 'Location', type: 'text', required: false },
-            { name: 'group', label: 'Group', type: 'select', required: false,
-              options: [
-                  { value: 'blo', label: 'BLO' },
-                  { value: 'coop', label: 'Cooperative' },
-                  { value: 'buyback', label: 'Buyback' }
-              ]
+            {
+                name: 'group', label: 'Group', type: 'select', required: false,
+                options: [
+                    { value: 'blo', label: 'BLO' },
+                    { value: 'coop', label: 'Cooperative' },
+                    { value: 'buyback', label: 'Buyback' }
+                ]
             },
             { name: 'farmer_id', label: 'Farmer ID', type: 'text', required: false },
             { name: 'assign_tps', label: 'Assign TPS', type: 'text', required: false }
@@ -1590,22 +2332,24 @@ function getEntityFields(entityType) {
             { name: 'miller_id', label: 'Miller', type: 'select', required: true, options: transactionFormOptions.millers },
             { name: 'input_quantity', label: 'Input Quantity (kg)', type: 'number', required: true },
             { name: 'output_quantity', label: 'Output Quantity (kg)', type: 'number', required: true },
-            { name: 'quality', label: 'Quality', type: 'select', required: false,
-              options: [
-                  { value: 'premium', label: 'Premium' },
-                  { value: 'grade_a', label: 'Grade A' },
-                  { value: 'grade_b', label: 'Grade B' },
-                  { value: 'standard', label: 'Standard' }
-              ]
+            {
+                name: 'quality', label: 'Quality', type: 'select', required: false,
+                options: [
+                    { value: 'premium', label: 'Premium' },
+                    { value: 'grade_a', label: 'Grade A' },
+                    { value: 'grade_b', label: 'Grade B' },
+                    { value: 'standard', label: 'Standard' }
+                ]
             },
-            { name: 'machine', label: 'Machine', type: 'select', required: false,
-              options: [
-                  { value: 'mobile_rice_mill_type_1', label: 'Mobile Rice Mill Type 1' },
-                  { value: 'mobile_rice_mill_type_2', label: 'Mobile Rice Mill Type 2' },
-                  { value: 'stationary_rice_mill', label: 'Stationary Rice Mill' },
-                  { value: 'mini_rice_mill', label: 'Mini Rice Mill' },
-                  { value: 'compact_rice_mill', label: 'Compact Rice Mill' }
-              ]
+            {
+                name: 'machine', label: 'Machine', type: 'select', required: false,
+                options: [
+                    { value: 'mobile_rice_mill_type_1', label: 'Mobile Rice Mill Type 1' },
+                    { value: 'mobile_rice_mill_type_2', label: 'Mobile Rice Mill Type 2' },
+                    { value: 'stationary_rice_mill', label: 'Stationary Rice Mill' },
+                    { value: 'mini_rice_mill', label: 'Mini Rice Mill' },
+                    { value: 'compact_rice_mill', label: 'Compact Rice Mill' }
+                ]
             }
         ],
         'chain_transactions': [
@@ -1614,39 +2358,42 @@ function getEntityFields(entityType) {
             { name: 'batch_id', label: 'Batch ID', type: 'select', required: false, options: transactionFormOptions.batches },
             { name: 'quantity', label: 'Quantity (kg)', type: 'number', required: false, placeholder: 'e.g., 100' },
             { name: 'price_per_kg', label: 'Price per KG', type: 'number', required: false },
-            { name: 'payment_reference', label: 'Payment Method', type: 'select', required: false,
-              options: [
-                  { value: '0', label: 'Cash' },
-                  { value: '1', label: 'Cheque' },
-                  { value: '2', label: 'Balance' }
-              ]
+            {
+                name: 'payment_reference', label: 'Payment Method', type: 'select', required: false,
+                options: [
+                    { value: '0', label: 'Cash' },
+                    { value: '1', label: 'Cheque' },
+                    { value: '2', label: 'Balance' }
+                ]
             },
-            { name: 'quality', label: 'Quality Grade', type: 'select', required: false,
-              options: [
-                  { value: '0', label: 'Premium' },
-                  { value: '1', label: 'Well-milled' },
-                  { value: '2', label: 'Regular' },
-                  { value: '3', label: 'Broken' }
-              ]
+            {
+                name: 'quality', label: 'Quality Grade', type: 'select', required: false,
+                options: [
+                    { value: '0', label: 'Premium' },
+                    { value: '1', label: 'Well-milled' },
+                    { value: '2', label: 'Regular' },
+                    { value: '3', label: 'Broken' }
+                ]
             },
             { name: 'moisture', label: 'Moisture Content (%)', type: 'text', required: false, placeholder: 'e.g., 14.5%' },
-            { name: 'status', label: 'Status', type: 'select', required: true, defaultValue: 'completed',
-              options: [
-                  { value: 'pending', label: 'Pending' },
-                  { value: 'completed', label: 'Completed' },
-                  { value: 'cancelled', label: 'Cancelled' }
-              ]
+            {
+                name: 'status', label: 'Status', type: 'select', required: true, defaultValue: 'completed',
+                options: [
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'completed', label: 'Completed' },
+                    { value: 'cancelled', label: 'Cancelled' }
+                ]
             }
         ]
     };
-    
+
     return fieldDefinitions[entityType] || [];
 }
 
 function populateForm(id) {
     const entity = currentData.find(item => item.id == id);
     if (!entity) return;
-    
+
     const fields = getEntityFields(currentEntity);
     fields.forEach(field => {
         const input = document.getElementById(field.name);
@@ -1673,18 +2420,18 @@ async function saveEntity() {
     try {
         const formData = collectFormData();
         const endpoint = getEntityEndpoint(currentEntity);
-        
+
         let response;
         if (isEditing) {
             response = await updateData(`${endpoint}/${editingId}`, formData);
         } else {
             response = await createData(endpoint, formData);
         }
-        
+
         if (response.success) {
             showToast(isEditing ? 'Updated successfully' : 'Created successfully', 'success');
             bootstrap.Modal.getInstance(document.getElementById('entityModal')).hide();
-            
+
             // Reload current section data
             switch (currentSection) {
                 case 'chain-actors':
@@ -1715,12 +2462,12 @@ async function saveEntity() {
 function collectFormData() {
     const fields = getEntityFields(currentEntity);
     const data = {};
-    
+
     fields.forEach(field => {
         const input = document.getElementById(field.name);
         if (input) {
             let value = input.value || null;
-            
+
             // Handle different field types
             if (field.type === 'checkbox') {
                 data[field.name] = input.checked;
@@ -1745,12 +2492,12 @@ function collectFormData() {
             }
         }
     });
-    
+
     // Always add transaction_date for transactions
     if (currentEntity === 'chain_transactions') {
         data.transaction_date = new Date().toISOString().split('T')[0];
     }
-    
+
     return data;
 }
 
@@ -1764,14 +2511,14 @@ async function deleteEntity(entityType, id) {
     if (!confirm('Are you sure you want to delete this item?')) {
         return;
     }
-    
+
     try {
         const endpoint = getEntityEndpoint(entityType);
         const response = await deleteData(`${endpoint}/${id}`);
-        
+
         if (response.success) {
             showToast('Deleted successfully', 'success');
-            
+
             // Reload current section data
             switch (currentSection) {
                 case 'chain-actors':
@@ -1800,8 +2547,30 @@ async function deleteEntity(entityType, id) {
 }
 
 // API Functions
+function getApiUrl(endpoint) {
+    // Chain transactions use local API_BASE_URL, all others use external API
+    if (endpoint === '/transactions') {
+        return `${API_BASE_URL}${endpoint}`;
+    }
+    // Map endpoints to external API paths
+    const externalEndpoints = {
+        '/chain-actors': '/api/mobile/trace/actor/get-all',
+        '/rice-batches': '/api/mobile/trace/batch/get-all',
+        '/milled-rice': '/api/mobile/trace/milling/get-all',
+        '/production-seasons': '/api/mobile/trace/season/get-all',
+        '/drying-data': '/api/mobile/trace/drying/get-all'
+    };
+    
+    if (externalEndpoints[endpoint]) {
+        return `${API_EXTERNAL_URL}${externalEndpoints[endpoint]}`;
+    }
+    
+    return `${API_BASE_URL}${endpoint}`;
+}
+
 async function fetchData(endpoint) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`);
+    const url = getApiUrl(endpoint);
+    const response = await fetch(url);
     return await response.json();
 }
 
@@ -1867,10 +2636,10 @@ function filterTable(searchTerm, tableType) {
     const tableId = `${tableType}-table`;
     const table = document.getElementById(tableId);
     if (!table) return;
-    
+
     const tbody = table.querySelector('tbody');
     const rows = tbody.querySelectorAll('tr');
-    
+
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const matches = text.includes(searchTerm.toLowerCase());
@@ -1891,13 +2660,13 @@ function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
     const toastBody = document.getElementById('toastBody');
     const toastTitle = document.getElementById('toastTitle');
-    
+
     toastTitle.textContent = type === 'error' ? 'Error' : 'Success';
     toastBody.textContent = message;
-    
+
     // Update toast styling based on type
     toast.className = `toast ${type === 'error' ? 'bg-danger text-white' : 'bg-success text-white'}`;
-    
+
     const bsToast = new bootstrap.Toast(toast);
     bsToast.show();
 }
@@ -1992,7 +2761,7 @@ function initializeApiTester() {
     // Initialize tables
     initializeHeadersTable();
     initializeBodyTable();
-    
+
     // Add event listeners for add buttons
     document.getElementById('add-header-btn').addEventListener('click', () => addHeaderRow());
     document.getElementById('generate-sample-btn').addEventListener('click', () => generateSampleData());
@@ -2002,7 +2771,7 @@ function initializeApiTester() {
         const baseUrl = 'http://localhost:3000';
         const endpoint = endpointSelect.value;
         urlInput.value = baseUrl + endpoint;
-        
+
         // Show/hide body section based on method
         const method = methodSelect.value;
         if (method === 'POST' || method === 'PUT') {
@@ -2010,7 +2779,7 @@ function initializeApiTester() {
         } else {
             bodySection.style.display = 'none';
         }
-        
+
         // Load pre-filled data for the selected endpoint
         loadEndpointTemplate(endpoint);
     }
@@ -2021,12 +2790,12 @@ function initializeApiTester() {
             // Clear existing data
             clearHeadersTable();
             clearBodyTable();
-            
+
             // Load headers
             template.headers.forEach(header => {
                 addHeaderRow(header.name, header.value);
             });
-            
+
             // Load body parameters
             template.body.forEach(param => {
                 addBodyRow(param.name, param.value);
@@ -2066,12 +2835,12 @@ function initializeApiTester() {
                 </button>
             </td>
         `;
-        
+
         // Add remove functionality
         row.querySelector('.remove-header-btn').addEventListener('click', () => {
             row.remove();
         });
-        
+
         tbody.appendChild(row);
     }
 
@@ -2087,7 +2856,7 @@ function initializeApiTester() {
                 <input type="text" class="form-control param-value" value="${value}" placeholder="Parameter value">
             </td>
         `;
-        
+
         tbody.appendChild(row);
     }
 
@@ -2102,251 +2871,251 @@ function initializeApiTester() {
     function getHeadersFromTable() {
         const headers = {};
         const headerRows = document.querySelectorAll('.header-row');
-        
+
         headerRows.forEach(row => {
             const nameInput = row.querySelector('.header-name');
             const valueInput = row.querySelector('.header-value');
-            
+
             if (nameInput && valueInput && nameInput.value.trim() && valueInput.value.trim()) {
                 headers[nameInput.value.trim()] = valueInput.value.trim();
             }
         });
-        
+
         return headers;
     }
 
     function getBodyFromTable() {
         const requestData = {};
         const paramRows = document.querySelectorAll('.param-row');
-        
+
         paramRows.forEach(row => {
             const keyInput = row.querySelector('.param-key');
             const valueInput = row.querySelector('.param-value');
-            
+
             if (keyInput && valueInput && keyInput.value.trim() && valueInput.value.trim()) {
                 let value = valueInput.value.trim();
-                
+
                 // Try to parse as number if it looks like a number
                 if (!isNaN(value) && !isNaN(parseFloat(value))) {
                     value = parseFloat(value);
                 }
-                
+
                 // Try to parse as boolean
                 if (value === 'true') value = true;
                 if (value === 'false') value = false;
-                
+
                 requestData[keyInput.value.trim()] = value;
             }
         });
-        
+
         // Add transaction date automatically for transactions
         if (endpointSelect && endpointSelect.value === '/api/transactions') {
             requestData.transaction_date = new Date().toISOString();
         }
-        
+
         return requestData;
     }
 
     function generateSampleData() {
         const endpoint = endpointSelect.value;
         const paramRows = document.querySelectorAll('.param-row');
-        
+
         try {
             paramRows.forEach(row => {
                 const keyInput = row.querySelector('.param-key');
                 const valueInput = row.querySelector('.param-value');
-                
+
                 if (keyInput && valueInput) {
                     const paramName = keyInput.value.trim().toLowerCase();
                     let sampleValue = '';
-                    
+
                     // Generate sample data - use Faker if available, otherwise use fallback
                     if (typeof faker !== 'undefined') {
-                    // Generate sample data using Faker.js (v3.1.0 API)
-                    switch (paramName) {
-                                case 'name':
-                                case 'farmer_name':
-                                case 'miller_name':
-                                    sampleValue = faker.name.findName();
-                                    break;
-                                case 'type':
-                                    sampleValue = faker.random.arrayElement(['farmer', 'miller', 'distributor', 'retailer']);
-                                    break;
-                                case 'contact_info':
-                                    sampleValue = faker.phone.phoneNumber();
-                                    break;
-                                case 'location':
-                                case 'farmer_location':
-                                    sampleValue = `${faker.address.city()}, ${faker.address.state()}`;
-                                    break;
-                                case 'group_name':
-                                    sampleValue = `${faker.company.companyName()} Cooperative`;
-                                    break;
-                                case 'farmer_id':
-                                case 'batch_id':
-                                    sampleValue = faker.random.number({ min: 1, max: 100 }).toString();
-                                    break;
-                                case 'season_name':
-                                    sampleValue = `${faker.random.arrayElement(['Spring', 'Summer', 'Fall', 'Winter'])} ${new Date().getFullYear()}`;
-                                    break;
-                                case 'planting_date':
-                                case 'harvest_date':
-                                case 'harvesting_date':
-                                case 'milling_date':
+                        // Generate sample data using Faker.js (v3.1.0 API)
+                        switch (paramName) {
+                            case 'name':
+                            case 'farmer_name':
+                            case 'miller_name':
+                                sampleValue = faker.name.findName();
+                                break;
+                            case 'type':
+                                sampleValue = faker.random.arrayElement(['farmer', 'miller', 'distributor', 'retailer']);
+                                break;
+                            case 'contact_info':
+                                sampleValue = faker.phone.phoneNumber();
+                                break;
+                            case 'location':
+                            case 'farmer_location':
+                                sampleValue = `${faker.address.city()}, ${faker.address.state()}`;
+                                break;
+                            case 'group_name':
+                                sampleValue = `${faker.company.companyName()} Cooperative`;
+                                break;
+                            case 'farmer_id':
+                            case 'batch_id':
+                                sampleValue = faker.random.number({ min: 1, max: 100 }).toString();
+                                break;
+                            case 'season_name':
+                                sampleValue = `${faker.random.arrayElement(['Spring', 'Summer', 'Fall', 'Winter'])} ${new Date().getFullYear()}`;
+                                break;
+                            case 'planting_date':
+                            case 'harvest_date':
+                            case 'harvesting_date':
+                            case 'milling_date':
+                                sampleValue = faker.date.past().toISOString().split('T')[0];
+                                break;
+                            case 'variety':
+                            case 'rice_variety':
+                                sampleValue = faker.random.arrayElement(['Jasmine', 'Basmati', 'Arborio', 'Brown Rice', 'Wild Rice']);
+                                break;
+                            case 'carbon_certified':
+                                sampleValue = faker.random.boolean().toString();
+                                break;
+                            case 'batch_number':
+                                sampleValue = `BATCH-${faker.random.alphaNumeric(8).toUpperCase()}`;
+                                break;
+                            case 'quantity_harvested':
+                            case 'input_quantity':
+                            case 'output_quantity':
+                            case 'quantity':
+                                sampleValue = faker.random.number({ min: 50, max: 1000 }).toString();
+                                break;
+                            case 'quality_grade':
+                                sampleValue = faker.random.arrayElement(['A', 'B', 'C', 'Premium', 'Standard']);
+                                break;
+                            case 'storage_conditions':
+                                sampleValue = faker.random.arrayElement(['Cool & Dry', 'Temperature Controlled', 'Warehouse Storage']);
+                                break;
+                            case 'certifications':
+                                sampleValue = faker.random.arrayElement(['Organic', 'Fair Trade', 'Non-GMO', 'Sustainable']);
+                                break;
+                            case 'yield_percentage':
+                                sampleValue = (faker.random.number({ min: 600, max: 950 }) / 10).toString();
+                                break;
+                            case 'from_actor':
+                            case 'to_actor':
+                                sampleValue = faker.name.findName();
+                                break;
+                            case 'total_amount':
+                                sampleValue = faker.random.number({ min: 1000, max: 50000 }).toString();
+                                break;
+                            case 'payment_reference':
+                                sampleValue = `PAY-${faker.random.alphaNumeric(10).toUpperCase()}`;
+                                break;
+                            case 'moisture_content':
+                                sampleValue = (faker.random.number({ min: 100, max: 200 }) / 10).toString();
+                                break;
+                            default:
+                                // Generic fallback based on data type patterns
+                                if (paramName.includes('date')) {
                                     sampleValue = faker.date.past().toISOString().split('T')[0];
-                                    break;
-                                case 'variety':
-                                case 'rice_variety':
-                                    sampleValue = faker.random.arrayElement(['Jasmine', 'Basmati', 'Arborio', 'Brown Rice', 'Wild Rice']);
-                                    break;
-                                case 'carbon_certified':
-                                    sampleValue = faker.random.boolean().toString();
-                                    break;
-                                case 'batch_number':
-                                    sampleValue = `BATCH-${faker.random.alphaNumeric(8).toUpperCase()}`;
-                                    break;
-                                case 'quantity_harvested':
-                                case 'input_quantity':
-                                case 'output_quantity':
-                                case 'quantity':
-                                    sampleValue = faker.random.number({ min: 50, max: 1000 }).toString();
-                                    break;
-                                case 'quality_grade':
-                                    sampleValue = faker.random.arrayElement(['A', 'B', 'C', 'Premium', 'Standard']);
-                                    break;
-                                case 'storage_conditions':
-                                    sampleValue = faker.random.arrayElement(['Cool & Dry', 'Temperature Controlled', 'Warehouse Storage']);
-                                    break;
-                                case 'certifications':
-                                    sampleValue = faker.random.arrayElement(['Organic', 'Fair Trade', 'Non-GMO', 'Sustainable']);
-                                    break;
-                                case 'yield_percentage':
-                                    sampleValue = (faker.random.number({ min: 600, max: 950 }) / 10).toString();
-                                    break;
-                                case 'from_actor':
-                                case 'to_actor':
-                                    sampleValue = faker.name.findName();
-                                    break;
-                                case 'total_amount':
-                                    sampleValue = faker.random.number({ min: 1000, max: 50000 }).toString();
-                                    break;
-                                case 'payment_reference':
-                                    sampleValue = `PAY-${faker.random.alphaNumeric(10).toUpperCase()}`;
-                                    break;
-                                case 'moisture_content':
-                                    sampleValue = (faker.random.number({ min: 100, max: 200 }) / 10).toString();
-                                    break;
-                                default:
-                                    // Generic fallback based on data type patterns
-                                    if (paramName.includes('date')) {
-                                        sampleValue = faker.date.past().toISOString().split('T')[0];
-                                    } else if (paramName.includes('amount') || paramName.includes('price')) {
-                                        sampleValue = faker.random.number({ min: 100, max: 10000 }).toString();
-                                    } else if (paramName.includes('id')) {
-                                        sampleValue = faker.random.number({ min: 1, max: 100 }).toString();
-                                    } else {
-                                        sampleValue = faker.lorem.words(2);
-                                    }
-                                    break;
-                            }
-                        } else {
-                            // Fallback basic sample data generation without Faker
-                            switch (paramName) {
-                                case 'name':
-                                case 'farmer_name':
-                                case 'miller_name':
-                                    sampleValue = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson'][Math.floor(Math.random() * 4)];
-                                    break;
-                                case 'type':
-                                    sampleValue = ['farmer', 'miller', 'distributor', 'retailer'][Math.floor(Math.random() * 4)];
-                                    break;
-                                case 'contact_info':
-                                    sampleValue = `+1-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`;
-                                    break;
-                                case 'location':
-                                case 'farmer_location':
-                                    sampleValue = ['Manila, Philippines', 'Cebu, Philippines', 'Davao, Philippines'][Math.floor(Math.random() * 3)];
-                                    break;
-                                case 'group_name':
-                                    sampleValue = ['Rice Farmers Cooperative', 'Agricultural Alliance', 'Harvest Group'][Math.floor(Math.random() * 3)];
-                                    break;
-                                case 'farmer_id':
-                                case 'batch_id':
-                                    sampleValue = (Math.floor(Math.random() * 100) + 1).toString();
-                                    break;
-                                case 'season_name':
-                                    sampleValue = `${['Spring', 'Summer', 'Fall', 'Winter'][Math.floor(Math.random() * 4)]} ${new Date().getFullYear()}`;
-                                    break;
-                                case 'planting_date':
-                                case 'harvest_date':
-                                case 'harvesting_date':
-                                case 'milling_date':
+                                } else if (paramName.includes('amount') || paramName.includes('price')) {
+                                    sampleValue = faker.random.number({ min: 100, max: 10000 }).toString();
+                                } else if (paramName.includes('id')) {
+                                    sampleValue = faker.random.number({ min: 1, max: 100 }).toString();
+                                } else {
+                                    sampleValue = faker.lorem.words(2);
+                                }
+                                break;
+                        }
+                    } else {
+                        // Fallback basic sample data generation without Faker
+                        switch (paramName) {
+                            case 'name':
+                            case 'farmer_name':
+                            case 'miller_name':
+                                sampleValue = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson'][Math.floor(Math.random() * 4)];
+                                break;
+                            case 'type':
+                                sampleValue = ['farmer', 'miller', 'distributor', 'retailer'][Math.floor(Math.random() * 4)];
+                                break;
+                            case 'contact_info':
+                                sampleValue = `+1-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`;
+                                break;
+                            case 'location':
+                            case 'farmer_location':
+                                sampleValue = ['Manila, Philippines', 'Cebu, Philippines', 'Davao, Philippines'][Math.floor(Math.random() * 3)];
+                                break;
+                            case 'group_name':
+                                sampleValue = ['Rice Farmers Cooperative', 'Agricultural Alliance', 'Harvest Group'][Math.floor(Math.random() * 3)];
+                                break;
+                            case 'farmer_id':
+                            case 'batch_id':
+                                sampleValue = (Math.floor(Math.random() * 100) + 1).toString();
+                                break;
+                            case 'season_name':
+                                sampleValue = `${['Spring', 'Summer', 'Fall', 'Winter'][Math.floor(Math.random() * 4)]} ${new Date().getFullYear()}`;
+                                break;
+                            case 'planting_date':
+                            case 'harvest_date':
+                            case 'harvesting_date':
+                            case 'milling_date':
+                                const pastDate = new Date();
+                                pastDate.setDate(pastDate.getDate() - Math.floor(Math.random() * 365));
+                                sampleValue = pastDate.toISOString().split('T')[0];
+                                break;
+                            case 'variety':
+                            case 'rice_variety':
+                                sampleValue = ['Jasmine', 'Basmati', 'Arborio', 'Brown Rice', 'Wild Rice'][Math.floor(Math.random() * 5)];
+                                break;
+                            case 'carbon_certified':
+                                sampleValue = Math.random() > 0.5 ? 'true' : 'false';
+                                break;
+                            case 'batch_number':
+                                sampleValue = `BATCH-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
+                                break;
+                            case 'quantity_harvested':
+                            case 'input_quantity':
+                            case 'output_quantity':
+                            case 'quantity':
+                                sampleValue = (Math.floor(Math.random() * 950) + 50).toString();
+                                break;
+                            case 'quality_grade':
+                                sampleValue = ['A', 'B', 'C', 'Premium', 'Standard'][Math.floor(Math.random() * 5)];
+                                break;
+                            case 'storage_conditions':
+                                sampleValue = ['Cool & Dry', 'Temperature Controlled', 'Warehouse Storage'][Math.floor(Math.random() * 3)];
+                                break;
+                            case 'certifications':
+                                sampleValue = ['Organic', 'Fair Trade', 'Non-GMO', 'Sustainable'][Math.floor(Math.random() * 4)];
+                                break;
+                            case 'yield_percentage':
+                                sampleValue = (Math.random() * 35 + 60).toFixed(1);
+                                break;
+                            case 'from_actor':
+                            case 'to_actor':
+                                sampleValue = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson'][Math.floor(Math.random() * 4)];
+                                break;
+                            case 'total_amount':
+                                sampleValue = (Math.floor(Math.random() * 49000) + 1000).toString();
+                                break;
+                            case 'payment_reference':
+                                sampleValue = `PAY-${Math.random().toString(36).substr(2, 10).toUpperCase()}`;
+                                break;
+                            case 'moisture_content':
+                                sampleValue = (Math.random() * 10 + 10).toFixed(1);
+                                break;
+                            default:
+                                // Generic fallback
+                                if (paramName.includes('date')) {
                                     const pastDate = new Date();
                                     pastDate.setDate(pastDate.getDate() - Math.floor(Math.random() * 365));
                                     sampleValue = pastDate.toISOString().split('T')[0];
-                                    break;
-                                case 'variety':
-                                case 'rice_variety':
-                                    sampleValue = ['Jasmine', 'Basmati', 'Arborio', 'Brown Rice', 'Wild Rice'][Math.floor(Math.random() * 5)];
-                                    break;
-                                case 'carbon_certified':
-                                    sampleValue = Math.random() > 0.5 ? 'true' : 'false';
-                                    break;
-                                case 'batch_number':
-                                    sampleValue = `BATCH-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
-                                    break;
-                                case 'quantity_harvested':
-                                case 'input_quantity':
-                                case 'output_quantity':
-                                case 'quantity':
-                                    sampleValue = (Math.floor(Math.random() * 950) + 50).toString();
-                                    break;
-                                case 'quality_grade':
-                                    sampleValue = ['A', 'B', 'C', 'Premium', 'Standard'][Math.floor(Math.random() * 5)];
-                                    break;
-                                case 'storage_conditions':
-                                    sampleValue = ['Cool & Dry', 'Temperature Controlled', 'Warehouse Storage'][Math.floor(Math.random() * 3)];
-                                    break;
-                                case 'certifications':
-                                    sampleValue = ['Organic', 'Fair Trade', 'Non-GMO', 'Sustainable'][Math.floor(Math.random() * 4)];
-                                    break;
-                                case 'yield_percentage':
-                                    sampleValue = (Math.random() * 35 + 60).toFixed(1);
-                                    break;
-                                case 'from_actor':
-                                case 'to_actor':
-                                    sampleValue = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson'][Math.floor(Math.random() * 4)];
-                                    break;
-                                case 'total_amount':
-                                    sampleValue = (Math.floor(Math.random() * 49000) + 1000).toString();
-                                    break;
-                                case 'payment_reference':
-                                    sampleValue = `PAY-${Math.random().toString(36).substr(2, 10).toUpperCase()}`;
-                                    break;
-                                case 'moisture_content':
-                                    sampleValue = (Math.random() * 10 + 10).toFixed(1);
-                                    break;
-                                default:
-                                    // Generic fallback
-                                    if (paramName.includes('date')) {
-                                        const pastDate = new Date();
-                                        pastDate.setDate(pastDate.getDate() - Math.floor(Math.random() * 365));
-                                        sampleValue = pastDate.toISOString().split('T')[0];
-                                    } else if (paramName.includes('amount') || paramName.includes('price')) {
-                                        sampleValue = (Math.floor(Math.random() * 9900) + 100).toString();
-                                    } else if (paramName.includes('id')) {
-                                        sampleValue = (Math.floor(Math.random() * 100) + 1).toString();
-                                    } else {
-                                        sampleValue = 'Sample Data';
-                                    }
-                                    break;
-                            }
+                                } else if (paramName.includes('amount') || paramName.includes('price')) {
+                                    sampleValue = (Math.floor(Math.random() * 9900) + 100).toString();
+                                } else if (paramName.includes('id')) {
+                                    sampleValue = (Math.floor(Math.random() * 100) + 1).toString();
+                                } else {
+                                    sampleValue = 'Sample Data';
+                                }
+                                break;
                         }
-                        
-                        valueInput.value = sampleValue;
                     }
-                });
-                
+
+                    valueInput.value = sampleValue;
+                }
+            });
+
             showToast('Sample data generated successfully!', 'success');
         } catch (error) {
             showToast('Error generating sample data: ' + error.message, 'error');
@@ -2354,7 +3123,7 @@ function initializeApiTester() {
     }
 
     // Send API request
-    sendButton.addEventListener('click', async function() {
+    sendButton.addEventListener('click', async function () {
         const method = methodSelect.value;
         const url = urlInput.value;
         const responseElement = document.getElementById('api-response');
@@ -2418,7 +3187,7 @@ function initializeApiTester() {
     });
 
     // Clear response
-    clearButton.addEventListener('click', function() {
+    clearButton.addEventListener('click', function () {
         document.getElementById('api-response').textContent = 'Click "Send Request" to see the response here...';
         document.getElementById('response-status').textContent = 'Ready';
         document.getElementById('response-status').className = 'badge bg-secondary';
@@ -2431,11 +3200,11 @@ function initializeApiTester() {
 async function loadBatchTracker() {
     try {
         showLoading(true);
-        
+
         // Load all batches from external API (optional for scanner)
-        const response = await fetch('https://digisaka.online/api/mobile/trace/batch/get-all');
+        const response = await fetch(`${API_EXTERNAL_URL}/api/mobile/trace/batch/get-all`);
         const data = await response.json();
-        
+
         if (data.success && data.data) {
             populateBatchList(data.data);
             setupBatchSearch(data.data);
@@ -2486,7 +3255,7 @@ function setupQRScanner() {
 
                 // Call external batch API
                 try {
-                    const resp = await fetch(`https://digisaka.online/api/mobile/trace/batch/${encodeURIComponent(qrValue)}`);
+                    const resp = await fetch(`${API_EXTERNAL_URL}/api/mobile/trace/batch/${encodeURIComponent(qrValue)}`);
                     const data = await resp.json();
                     console.log('Batch lookup result:', data);
                     if (data && data.success) {
@@ -2568,7 +3337,7 @@ function scanQRCode(video, onResult) {
 function populateBatchList(batches) {
     const batchList = document.getElementById('batch-list');
     batchList.innerHTML = '';
-    
+
     batches.forEach(batch => {
         const listItem = document.createElement('a');
         listItem.href = '#';
@@ -2583,33 +3352,33 @@ function populateBatchList(batches) {
             <p class="mb-1">Weight: ${batch.batch_weight_kg} kg</p>
             <small>Status: ${batch.status || 'Unknown'}</small>
         `;
-        
+
         listItem.addEventListener('click', (e) => {
             e.preventDefault();
             selectBatch(batch.qr_code);
-            
+
             // Update active state
             document.querySelectorAll('#batch-list .list-group-item').forEach(item => {
                 item.classList.remove('active');
             });
             listItem.classList.add('active');
         });
-        
+
         batchList.appendChild(listItem);
     });
 }
 
 function setupBatchSearch(batches) {
     const searchInput = document.getElementById('batch-search-input');
-    
+
     searchInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
-        const filteredBatches = batches.filter(batch => 
+        const filteredBatches = batches.filter(batch =>
             (batch.qr_code && batch.qr_code.toLowerCase().includes(searchTerm)) ||
             (batch.batch_weight_kg && batch.batch_weight_kg.toString().includes(searchTerm)) ||
             (batch.status && batch.status.toLowerCase().includes(searchTerm))
         );
-        
+
         populateBatchList(filteredBatches);
     });
 }
@@ -2617,17 +3386,17 @@ function setupBatchSearch(batches) {
 async function selectBatch(qrCode) {
     try {
         showLoading(true);
-        
+
         // Fetch batch data from external API using QR code
-        const response = await fetch(`https://digisaka.online/api/mobile/trace/batch/${qrCode}`);
+        const response = await fetch(`${API_EXTERNAL_URL}/api/mobile/trace/batch/${qrCode}`);
         const data = await response.json();
-        
+
         if (data.success && data.data) {
             displayBatchDetails(data.data);
         } else {
             showToast('Batch not found', 'error');
         }
-        
+
         showLoading(false);
     } catch (error) {
         console.error('Error loading batch details:', error);
@@ -2640,7 +3409,7 @@ function displayBatchDetails(batch) {
     // Show batch details section and hide empty state
     document.getElementById('batch-details').style.display = 'block';
     document.getElementById('batch-empty-state').style.display = 'none';
-    
+
     // Populate batch overview
     const batchOverview = document.getElementById('batch-overview');
     batchOverview.innerHTML = `
@@ -2657,7 +3426,7 @@ function displayBatchDetails(batch) {
             <p><strong>Updated:</strong> ${batch.updated_at ? new Date(batch.updated_at).toLocaleDateString() : 'N/A'}</p>
         </div>
     `;
-    
+
     // Populate milling information
     const farmerInfo = document.getElementById('farmer-info');
     farmerInfo.innerHTML = `
@@ -2670,7 +3439,7 @@ function displayBatchDetails(batch) {
             <p><strong>Validator:</strong> ${batch.validator || 'Pending'}</p>
         </div>
     `;
-    
+
     // Populate season information
     const seasonInfo = document.getElementById('season-info');
     seasonInfo.innerHTML = `
@@ -2678,11 +3447,11 @@ function displayBatchDetails(batch) {
             <p class="text-muted"><i class="fas fa-info-circle me-2"></i>Additional batch information is available in the batch details above.</p>
         </div>
     `;
-    
+
     // Hide milling data section (not available from this API)
     const millingDataDiv = document.getElementById('milling-data');
     millingDataDiv.innerHTML = '<p class="text-muted">Milling data not available in current API response.</p>';
-    
+
     // Hide transaction history section (not available from this API)
     const transactionsTbody = document.getElementById('batch-transactions-tbody');
     transactionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Transaction history not available in current API response.</td></tr>';
@@ -2701,12 +3470,12 @@ async function showActorInfo(actorId) {
         const response = await fetchData(`/chain-actors/${actorId}`);
         if (response.success && response.data) {
             const actor = response.data;
-            
+
             const modalTitle = document.getElementById('actorModalTitle');
             const modalContent = document.getElementById('actorInfoContent');
-            
+
             modalTitle.innerHTML = `<i class="fas fa-user me-2"></i>${actor.name}`;
-            
+
             modalContent.innerHTML = `
                 <div class="row">
                     <div class="col-md-6">
@@ -2774,10 +3543,10 @@ async function showActorInfo(actorId) {
                     </div>
                 </div>
             `;
-            
+
             // Load activity statistics
             loadActorStatistics(actorId);
-            
+
             const modal = new bootstrap.Modal(document.getElementById('actorInfoModal'));
             modal.show();
         } else {
@@ -2796,34 +3565,34 @@ async function loadActorStatistics(actorId) {
             fetchData('/transactions'),
             fetchData('/rice-batches')
         ]);
-        
+
         const transactions = transactionsResponse.data || [];
         const batches = batchesResponse.data || [];
-        
+
         // Filter transactions for this actor
-        const actorTransactions = transactions.filter(tx => 
+        const actorTransactions = transactions.filter(tx =>
             tx.from_actor_id == actorId || tx.to_actor_id == actorId
         );
-        
+
         // Filter batches for this actor (if farmer)
         const actorBatches = batches.filter(batch => batch.farmer_id == actorId);
-        
+
         // Calculate statistics
         const transactionCount = actorTransactions.length;
         const batchCount = actorBatches.length;
-        const totalVolume = actorBatches.reduce((sum, batch) => 
+        const totalVolume = actorBatches.reduce((sum, batch) =>
             sum + (parseFloat(batch.quantity_harvested) || 0), 0
         );
-        const totalValue = actorTransactions.reduce((sum, tx) => 
+        const totalValue = actorTransactions.reduce((sum, tx) =>
             sum + (parseFloat(tx.total_amount) || 0), 0
         );
-        
+
         // Update UI
         document.getElementById('actor-transactions-count').textContent = transactionCount;
         document.getElementById('actor-batches-count').textContent = batchCount;
         document.getElementById('actor-volume').textContent = totalVolume.toFixed(2);
         document.getElementById('actor-value').textContent = totalValue.toFixed(2);
-        
+
     } catch (error) {
         console.error('Error loading actor statistics:', error);
     }
@@ -2833,7 +3602,7 @@ async function loadActorStatistics(actorId) {
 function openBatchDetails(batchId) {
     // Switch to batch tracker section
     showSection('batch-tracker');
-    
+
     // Load and select the specific batch
     setTimeout(() => {
         selectBatch(batchId);
@@ -2845,10 +3614,10 @@ function filterTable(searchTerm, tableType) {
     const tableId = tableType === 'solana-transactions' ? 'solana-transactions-table' : `${tableType}-table`;
     const table = document.getElementById(tableId);
     if (!table) return;
-    
+
     const tbody = table.querySelector('tbody');
     const rows = tbody.querySelectorAll('tr');
-    
+
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const matches = text.includes(searchTerm.toLowerCase());
@@ -2865,8 +3634,8 @@ function getStatusBadgeClass(status) {
         const statusMap = { 0: 'cancelled', 1: 'completed', 2: 'pending' };
         statusStr = statusMap[status] || 'unknown';
     }
-    
-    switch(statusStr?.toLowerCase()) {
+
+    switch (statusStr?.toLowerCase()) {
         case 'completed': return 'bg-success';
         case 'pending': return 'bg-warning';
         case 'cancelled': return 'bg-danger';
@@ -2882,12 +3651,6 @@ function formatDate(dateString) {
     } catch {
         return dateString;
     }
-}
-
-// Fetch data helper
-async function fetchData(endpoint) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`);
-    return await response.json();
 }
 
 // Show loading helper
@@ -2936,4 +3699,264 @@ function showTableError(tbodyId, message) {
 // Show toast helper
 function showToast(message, type = 'info') {
     console.log(`Toast (${type}): ${message}`);
+}
+
+// Transaction Summary Functions
+async function loadTransactionSummary() {
+    try {
+        showTableLoading('transaction-summary-tbody');
+
+        // Get the selected filter value
+        const filterSelect = document.getElementById('transaction-filter');
+        const filter = filterSelect ? filterSelect.value : 'all';
+
+        // Fetch from external API
+        const response = await fetch(`${API_EXTERNAL_URL}/api/mobile/trace/transaction/summary/${filter}`);
+        const data = await response.json();
+
+        if (data.success) {
+            renderTransactionSummaryTable(data.data || []);
+        } else {
+            showTableError('transaction-summary-tbody', 'Error loading transaction summary');
+        }
+
+        // Setup filter change listener
+        if (filterSelect) {
+            filterSelect.removeEventListener('change', loadTransactionSummary);
+            filterSelect.addEventListener('change', loadTransactionSummary);
+        }
+    } catch (error) {
+        console.error('Error loading transaction summary:', error);
+        showToast('Error loading transaction summary', 'error');
+        showTableError('transaction-summary-tbody', 'Error loading transaction summary');
+    }
+}
+
+function renderTransactionSummaryTable(data) {
+    const tbody = document.getElementById('transaction-summary-tbody');
+    tbody.innerHTML = '';
+
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No transaction summary data found</td></tr>';
+        return;
+    }
+
+    data.forEach(transaction => {
+        const row = document.createElement('tr');
+
+        // Parse address JSON
+        let addressName = '-';
+        try {
+            if (transaction.address) {
+                const addressObj = JSON.parse(transaction.address);
+                addressName = addressObj.name || '-';
+            }
+        } catch (e) {
+            addressName = transaction.address || '-';
+        }
+
+        // Determine badge category
+        let badgeCategory = transaction.category || 'none';
+        let badgeColor = 'bg-secondary';
+        let categoryDisplay = 'None';
+        
+        if (badgeCategory === 'buyback') {
+            badgeColor = 'bg-primary';
+            categoryDisplay = 'Buyback';
+        } else if (badgeCategory === 'blo') {
+            badgeColor = 'bg-success';
+            categoryDisplay = 'BLO';
+        } else if (badgeCategory === 'coop') {
+            badgeColor = 'bg-info';
+            categoryDisplay = 'COOP';
+        } else if (badgeCategory === 'individual') {
+            badgeColor = 'bg-warning';
+            categoryDisplay = 'Individual';
+        }
+
+        row.innerHTML = `
+            <td>${transaction.season || '-'}</td>
+            <td>${transaction.farmers_name || '-'}</td>
+            <td>${addressName}</td>
+            <td>${transaction.ha || '0'}</td>
+            <td>${transaction.variety || '-'}</td>
+            <td>${transaction.kgs || '0'}</td>
+            <td>₱${transaction.price_kg || '0'}</td>
+            <td><strong>₱${transaction.fresh_harvest || '0'}</strong></td>
+            <td><span class="badge ${badgeColor}">${categoryDisplay}</span></td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Drying Data Functions
+async function loadDryingData(page = 1) {
+    try {
+        showTableLoading('drying-data-tbody');
+        const baseUrl = getApiUrl('/drying-data');
+        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        // Handle paginated response
+        const dryingData = data.data.data || data.data || [];
+        const paginationInfo = data.data.current_page ? data.data : null;
+        
+        currentData = dryingData;
+        renderDryingDataTable(dryingData);
+        
+        // Render pagination if available
+        if (paginationInfo) {
+            renderDryingPagination(paginationInfo);
+        }
+        
+        // Setup search
+        setupDryingDataSearch();
+    } catch (error) {
+        console.error('Error loading drying data:', error);
+        showToast('Error loading drying data', 'error');
+        showTableError('drying-data-tbody', 'Error loading drying data');
+    }
+}
+
+function renderDryingDataTable(data) {
+    const tbody = document.getElementById('drying-data-tbody');
+    tbody.innerHTML = '';
+
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No drying data found</td></tr>';
+        return;
+    }
+
+    data.forEach(item => {
+        const row = document.createElement('tr');
+        const initialMc = item.initial_mc ? `${item.initial_mc}%` : '-';
+        const finalMc = item.final_mc ? `${item.final_mc}%` : '-';
+        const initialWeight = item.initial_weight ? `${item.initial_weight} kg` : '-';
+        const finalWeight = item.final_weight ? `${item.final_weight} kg` : '-';
+        const duration = item.duration ? `${item.duration} hrs` : '-';
+        const temperature = item.temperature ? `${item.temperature}°C` : '-';
+        const humidity = item.humidity ? `${item.humidity}%` : '-';
+        const airflow = item.airflow || '-';
+        const price = item.price ? `₱${item.price}` : '₱0.00';
+        
+        // Determine drying method badge
+        const isNullHumidity = item.humidity === null || item.humidity === undefined || item.humidity === '';
+        const isNullTemperature = item.temperature === null || item.temperature === undefined || item.temperature === '';
+        const isNullAirflow = item.airflow === null || item.airflow === undefined || item.airflow === '';
+        
+        let methodBadgeColor = 'bg-success';
+        let methodDisplay = 'Machine';
+        
+        if (isNullHumidity && isNullTemperature && isNullAirflow) {
+            methodBadgeColor = 'bg-warning';
+            methodDisplay = 'Sun';
+        }
+        
+        const methodBadge = `<span class="badge ${methodBadgeColor}">${methodDisplay}</span>`;
+        
+        row.innerHTML = `
+            <td>${methodBadge}</td>
+            <td>${initialMc}</td>
+            <td>${finalMc}</td>
+            <td>${initialWeight}</td>
+            <td>${finalWeight}</td>
+            <td>${duration}</td>
+            <td>${temperature}</td>
+            <td>${humidity}</td>
+            <td>${airflow}</td>
+            <td>${price}</td>
+            <td class="action-buttons">
+                <button class="btn btn-sm btn-warning" onclick="editEntity('drying_data', ${item.id})">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function setupDryingDataSearch() {
+    const searchInput = document.getElementById('drying-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterTable(e.target.value, 'drying-data');
+        });
+    }
+}
+
+function renderDryingPagination(paginationInfo) {
+    const paginationContainer = document.getElementById('drying-pagination');
+    if (!paginationContainer) return;
+    
+    const currentPage = paginationInfo.current_page;
+    const lastPage = paginationInfo.last_page;
+    const total = paginationInfo.total;
+    const perPage = paginationInfo.per_page;
+    
+    // Generate page numbers to display (show up to 7 pages)
+    let pageNumbers = [];
+    if (lastPage <= 7) {
+        pageNumbers = Array.from({ length: lastPage }, (_, i) => i + 1);
+    } else {
+        pageNumbers = [1];
+        const startPage = Math.max(2, currentPage - 2);
+        const endPage = Math.min(lastPage - 1, currentPage + 2);
+        if (startPage > 2) pageNumbers.push('...');
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(i);
+        }
+        if (endPage < lastPage - 1) pageNumbers.push('...');
+        pageNumbers.push(lastPage);
+    }
+
+    const html = `
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-muted fw-semibold">Show</small>
+                <select class="form-select form-select-sm" id="drying-per-page" style="width: auto;">
+                    <option value="10" ${perPage === 10 ? 'selected' : ''}>10</option>
+                    <option value="20" ${perPage === 20 ? 'selected' : ''}>20</option>
+                    <option value="50" ${perPage === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${perPage === 100 ? 'selected' : ''}>100</option>
+                </select>
+                <small class="text-muted fw-semibold">entries</small>
+            </div>
+            <small class="text-muted">Showing ${total === 0 ? 0 : (currentPage - 1) * perPage + 1}-${Math.min(currentPage * perPage, total)} of ${total} records</small>
+            <nav aria-label="Drying pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeDryingPage(1); return false;" title="First Page">
+                            <i class="fas fa-step-backward"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeDryingPage(${currentPage - 1}); return false;" title="Previous Page">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    ${pageNumbers.map(pageNum => pageNum === '...' ? `<li class="page-item disabled"><span class="page-link">...</span></li>` : `<li class="page-item ${pageNum === currentPage ? 'active' : ''}"><a class="page-link" href="#" onclick="changeDryingPage(${pageNum}); return false;">${pageNum}</a></li>`).join('')}
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeDryingPage(${currentPage + 1}); return false;" title="Next Page">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item ${currentPage === lastPage ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="changeDryingPage(${lastPage}); return false;" title="Last Page">
+                            <i class="fas fa-step-forward"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    `;
+    paginationContainer.innerHTML = html;
+    const perPageSelect = document.getElementById('drying-per-page');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', () => loadDryingData(1));
+    }
+}
+
+function changeDryingPage(page) {
+    loadDryingData(page);
 }

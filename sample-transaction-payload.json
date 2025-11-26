@@ -1,0 +1,172 @@
+{
+  "description": "Sample payload for POST /api/transactions - Create new transaction on Solana",
+  "endpoint": "POST /api/transactions",
+  "examples": [
+    {
+      "name": "Basic Transaction - Rice Purchase from Farmer",
+      "payload": {
+        "from_actor_id": 1,
+        "to_actor_id": 2,
+        "batch_id": 1,
+        "quantity": "1000",
+        "price_per_kg": "2.50",
+        "total_amount": "2500.00",
+        "payment_reference": "cash",
+        "status": "completed",
+        "moisture": "12.5",
+        "is_test": 1
+      },
+      "description": "Farmer sells 1000kg of rice at 2.50 per kg"
+    },
+    {
+      "name": "Mill Processing Transaction",
+      "payload": {
+        "from_actor_id": 2,
+        "to_actor_id": 3,
+        "batch_id": 1,
+        "quantity": "950",
+        "price_per_kg": "3.00",
+        "total_amount": "2850.00",
+        "payment_reference": "cheque",
+        "status": "completed",
+        "moisture": "10.2",
+        "is_test": 1
+      },
+      "description": "Mill processes rice batch, 50kg loss during milling"
+    },
+    {
+      "name": "Distribution to Retailer",
+      "payload": {
+        "from_actor_id": 3,
+        "to_actor_id": 4,
+        "batch_id": 1,
+        "quantity": "500",
+        "price_per_kg": "4.50",
+        "total_amount": "2250.00",
+        "payment_reference": "balance",
+        "status": "pending",
+        "moisture": "9.8",
+        "is_test": 1
+      },
+      "description": "Distributor sends rice to retailer"
+    },
+    {
+      "name": "Multiple Batches Transaction",
+      "payload": {
+        "from_actor_id": 1,
+        "to_actor_id": 2,
+        "batch_ids": [1, 2, 3],
+        "quantity": "3000",
+        "price_per_kg": "2.75",
+        "total_amount": "8250.00",
+        "payment_reference": "cash",
+        "status": "completed",
+        "moisture": "11.5",
+        "is_test": 0
+      },
+      "description": "Farmer sells multiple batches combined"
+    }
+  ],
+  "field_definitions": {
+    "from_actor_id": {
+      "type": "number",
+      "required": true,
+      "description": "ID of the actor sending the rice (e.g., 1=Farmer, 2=Mill, 3=Distributor, 4=Retailer)"
+    },
+    "to_actor_id": {
+      "type": "number",
+      "required": true,
+      "description": "ID of the actor receiving the rice"
+    },
+    "batch_id": {
+      "type": "number",
+      "required": false,
+      "description": "Single batch ID (use batch_ids for multiple)"
+    },
+    "batch_ids": {
+      "type": "array",
+      "required": false,
+      "description": "Array of batch IDs for multi-batch transactions"
+    },
+    "quantity": {
+      "type": "string",
+      "required": false,
+      "description": "Quantity in kg (e.g., '1000', '950.5')"
+    },
+    "price_per_kg": {
+      "type": "string",
+      "required": false,
+      "description": "Price per kg (e.g., '2.50', '3.00')"
+    },
+    "total_amount": {
+      "type": "string",
+      "required": false,
+      "description": "Total transaction amount (e.g., '2500.00')"
+    },
+    "payment_reference": {
+      "type": "string",
+      "enum": ["cash", "cheque", "balance", "0", "1", "2"],
+      "required": false,
+      "description": "Payment method: 'cash'(0), 'cheque'(1), or 'balance'(2)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "pending", "cancelled", "0", "1", "2"],
+      "required": false,
+      "description": "Transaction status: 'cancelled'(0), 'completed'(1), 'pending'(2)"
+    },
+    "moisture": {
+      "type": "string",
+      "required": false,
+      "description": "Moisture percentage (e.g., '12.5', '10.2')"
+    },
+    "is_test": {
+      "type": "number",
+      "enum": [0, 1],
+      "required": false,
+      "description": "Test flag: 1=test transaction, 0=production"
+    },
+    "nonce": {
+      "type": "number",
+      "required": false,
+      "description": "Nonce for PDA derivation (0-255, default: 0)"
+    }
+  },
+  "response_example": {
+    "success": true,
+    "data": {
+      "from_actor_id": 1,
+      "to_actor_id": 2,
+      "batch_ids": [1],
+      "batch_id": 1,
+      "quantity": "1000",
+      "unit_price": "2.50",
+      "payment_reference": 0,
+      "transaction_date": "2025-11-25T13:43:00.000Z",
+      "status": 1,
+      "moisture": 12,
+      "is_test": 1,
+      "nonce": 0,
+      "publicKey": "7kZ9mQ2xRpL8vN3wK5jH6gF4dE2sA9bC1tU7yV5xW3z",
+      "signature": "5hJ8kL2pQ9mN6vR3wS1tU4xY7zA2bC5dE8fG1hI4jK7lM0nO3pQ6rS9tU2vW5xY8z",
+      "data_hash": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6",
+      "blockchain_verified": true,
+      "created_at": 1732516980000,
+      "updated_at": 1732516980000
+    },
+    "message": "Transaction created successfully on blockchain"
+  },
+  "curl_examples": {
+    "basic": "curl -X POST http://localhost:3000/api/transactions -H 'Content-Type: application/json' -d '{\"from_actor_id\": 1, \"to_actor_id\": 2, \"batch_id\": 1, \"quantity\": \"1000\", \"price_per_kg\": \"2.50\", \"payment_reference\": \"cash\", \"status\": \"completed\", \"moisture\": \"12.5\", \"is_test\": 1}'",
+    "with_nonce": "curl -X POST http://localhost:3000/api/transactions -H 'Content-Type: application/json' -d '{\"from_actor_id\": 2, \"to_actor_id\": 3, \"batch_id\": 1, \"quantity\": \"950\", \"price_per_kg\": \"3.00\", \"payment_reference\": \"cheque\", \"status\": \"completed\", \"moisture\": \"10.2\", \"is_test\": 1}'",
+    "multiple_batches": "curl -X POST http://localhost:3000/api/transactions -H 'Content-Type: application/json' -d '{\"from_actor_id\": 1, \"to_actor_id\": 2, \"batch_ids\": [1, 2, 3], \"quantity\": \"3000\", \"price_per_kg\": \"2.75\", \"payment_reference\": \"cash\", \"status\": \"completed\", \"is_test\": 0}'"
+  },
+  "notes": {
+    "actor_ids": "1=Farmer, 2=Mill/Processor, 3=Distributor, 4=Retailer, 5=Consumer",
+    "payment_reference": "Accepts both string names and numeric values",
+    "status": "Accepts both string names and numeric values",
+    "blockchain": "All transactions are stored on Solana blockchain with Memo program for JSON data",
+    "rate_limiting": "Requests are queued to prevent rate limiting (500ms delay between requests)",
+    "pda_derivation": "Uses seeds: ['tx', authority_pubkey, nonce]"
+  }
+}
