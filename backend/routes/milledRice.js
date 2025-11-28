@@ -1,5 +1,34 @@
 const express = require('express');
 const router = express.Router();
+const externalApi = require('../services/externalApiClient');
+
+function forwardSuccess(res, payload) {
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        return res.json(payload);
+    }
+
+    return res.json({ success: true, data: payload });
+}
+
+function handleExternalApiError(res, error, fallbackMessage) {
+    const status = error.status || error.response?.status || 500;
+    const message = error.message || fallbackMessage;
+    const data = error.data || error.response?.data;
+
+    if (data && typeof data === 'object') {
+        return res.status(status).json({
+            success: false,
+            message: data.message || message,
+            error: data.error || message,
+            data: data.data || null
+        });
+    }
+
+    return res.status(status).json({
+        success: false,
+        message
+    });
+}
 
 // Mock milled rice data - blockchain-only system
 const mockMilledRice = [
@@ -70,9 +99,32 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// POST /api/milled-rice - Create milled rice record
+// POST /api/milled-rice - Create milled rice record (upsert without id)
 router.post('/', async (req, res) => {
     try {
+        const data = await externalApi.post('/mobile/trace/milling/upsert', req.body);
+        forwardSuccess(res, data);
+    } catch (error) {
+        console.error('Proxy error creating milled rice record:', error);
+        handleExternalApiError(res, error, 'Failed to create milled rice record');
+    }
+});
+
+// POST /api/milled-rice/:id - Upsert milled rice record (update with id)
+router.post('/:id', async (req, res) => {
+    try {
+        const data = await externalApi.post(`/mobile/trace/milling/upsert/${req.params.id}`, req.body);
+        forwardSuccess(res, data);
+    } catch (error) {
+        console.error('Proxy error updating milled rice record:', error);
+        handleExternalApiError(res, error, 'Failed to update milled rice record');
+    }
+});
+
+// PUT /api/milled-rice/:id - Update milled rice record
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
         const {
             batch_id,
             rice_variety,
@@ -88,114 +140,137 @@ router.post('/', async (req, res) => {
             storage_location
         } = req.body;
         
-        // Validate required fields
-        if (!batch_id || !rice_variety || !milling_date || !miller_id || !input_quantity || !output_quantity) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: batch_id, rice_variety, milling_date, miller_id, input_quantity, output_quantity'
-            });
-        }
-        
-        // Validate foreign key constraints
-        const { data: batch } = await database.supabase
-            .from('rice_batches')
-            .select('id')
-            .eq('id', batch_id)
-            .single();
-            
-        if (!batch) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid batch_id: rice batch not found'
-            });
-        }
-        
-        const { data: miller } = await database.supabase
-            .from('chain_actors')
-            .select('id')
-            .eq('id', miller_id)
-            .eq('type', 'miller')
-            .single();
-            
-        if (!miller) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid miller_id: miller not found or not of type "miller"'
-            });
-        }
-        
-        // Validate date format
-        const millingDate = new Date(milling_date);
-        if (isNaN(millingDate.getTime())) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid milling_date format. Use YYYY-MM-DD format'
-            });
-        }
-        
-        // Validate quantities
-        const inputQty = parseFloat(input_quantity);
-        const outputQty = parseFloat(output_quantity);
-        if (isNaN(inputQty) || inputQty <= 0) {
-            return res.status(400).json({
-                success: false,
-                error: 'input_quantity must be a positive number'
-            });
-        }
-        if (isNaN(outputQty) || outputQty <= 0) {
-            return res.status(400).json({
-                success: false,
-                error: 'output_quantity must be a positive number'
-            });
-        }
-        
-        // Calculate milling yield percentage if not provided
-        const yieldPercentage = milling_yield_percentage || ((outputQty / inputQty) * 100).toFixed(2);
-        
-        const { data: newMilledRice, error: insertError } = await database.supabase
+        // Check if record exists
+        const { data: existingRecord, error: checkError } = await database.supabase
             .from('milled_rice')
-            .insert({
-                batch_id,
-                rice_variety,
-                grade: grade || null,
-                milling_date,
-                miller_id,
-                input_quantity,
-                output_quantity,
-                quality: quality || null,
-                machine: machine || null,
-                milling_yield_percentage: yieldPercentage,
-                storage_location: storage_location || null
-            })
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+        if (checkError || !existingRecord) {
+            return res.status(404).json({
+                success: false,
+                error: 'Milled rice record not found'
+            });
+        }
+        
+        // Validate foreign key constraints if provided
+        if (batch_id) {
+            const { data: batch } = await database.supabase
+                .from('rice_batches')
+                .select('id')
+                .eq('id', batch_id)
+                .single();
+                
+            if (!batch) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid batch_id: rice batch not found'
+                });
+            }
+        }
+        
+        if (miller_id) {
+            const { data: miller } = await database.supabase
+                .from('chain_actors')
+                .select('id')
+                .eq('id', miller_id)
+                .eq('type', 'miller')
+                .single();
+                
+            if (!miller) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid miller_id: miller not found or not of type "miller"'
+                });
+            }
+        }
+        
+        // Validate date format if provided
+        if (milling_date) {
+            const millingDate = new Date(milling_date);
+            if (isNaN(millingDate.getTime())) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid milling_date format. Use YYYY-MM-DD format'
+                });
+            }
+        }
+        
+        // Validate quantities if provided
+        if (input_quantity !== undefined) {
+            const inputQty = parseFloat(input_quantity);
+            if (isNaN(inputQty) || inputQty <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'input_quantity must be a positive number'
+                });
+            }
+        }
+        if (output_quantity !== undefined) {
+            const outputQty = parseFloat(output_quantity);
+            if (isNaN(outputQty) || outputQty <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'output_quantity must be a positive number'
+                });
+            }
+        }
+        
+        const updateData = {};
+        if (batch_id !== undefined) updateData.batch_id = batch_id;
+        if (rice_variety !== undefined) updateData.rice_variety = rice_variety;
+        if (grade !== undefined) updateData.grade = grade;
+        if (milling_date !== undefined) updateData.milling_date = milling_date;
+        if (miller_id !== undefined) updateData.miller_id = miller_id;
+        if (input_quantity !== undefined) updateData.input_quantity = input_quantity;
+        if (output_quantity !== undefined) updateData.output_quantity = output_quantity;
+        if (quality !== undefined) updateData.quality = quality;
+        if (machine !== undefined) updateData.machine = machine;
+        if (milling_yield_percentage !== undefined) updateData.milling_yield_percentage = milling_yield_percentage;
+        if (storage_location !== undefined) updateData.storage_location = storage_location;
+
+        const { error: updateError } = await database.supabase
+            .from('milled_rice')
+            .update(updateData)
+            .eq('id', id);
+
+        if (updateError) {
+            throw updateError;
+        }
+        
+        const { data: updatedRecord, error: fetchError } = await database.supabase
+            .from('milled_rice')
             .select(`
                 *,
-                rice_batch:rice_batches!batch_id(batch_number),
-                miller:chain_actors!miller_id(name)
+                miller:chain_actors!miller_id(name),
+                rice_batch:rice_batches!batch_id(batch_number)
             `)
+            .eq('id', id)
             .single();
 
-        if (insertError) {
-            throw insertError;
+        if (fetchError) {
+            throw fetchError;
         }
-        
+
         // Transform the data to match expected format
         const transformedData = {
-            ...newMilledRice,
-            batch_number: newMilledRice.rice_batch?.batch_number || null,
-            miller_name: newMilledRice.miller?.name || null
+            ...updatedRecord,
+            miller_name: updatedRecord.miller?.name || null,
+            batch_number: updatedRecord.rice_batch?.batch_number || null
         };
         
-        res.status(201).json({
+        res.json({
             success: true,
             data: transformedData,
-            message: 'Milled rice record created successfully'
+            message: 'Milled rice record updated successfully'
         });
         
     } catch (error) {
-        console.error('Error creating milled rice record:', error);
+        console.error('Error updating milled rice record:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to create milled rice record',
+            error: 'Failed to update milled rice record',
             message: error.message
         });
     }

@@ -3,8 +3,8 @@
 // Configuration
 // Dynamic API base URL that works for both local development and deployed environments
 const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api`;
-const API_EXTERNAL_URL = "https://digisaka.app";
-//  const API_EXTERNAL_URL = "https://ds.capiroso.site";
+  const API_EXTERNAL_URL = "https://digisaka.app";
+  // const API_EXTERNAL_URL = "https://ds.capiroso.site";
 
 // Global variables
 let currentSection = 'dashboard';
@@ -25,6 +25,13 @@ let transactionsPaginationState = {
         quantityMin: 0,
         quantityMax: 10000
     }
+};
+
+// Transaction Summary Filter State
+let transactionSummaryFilters = {
+    dateFrom: '',
+    dateTo: '',
+    category: 'all'
 };
 
 // Initialize the application
@@ -511,8 +518,7 @@ async function loadDashboard() {
 async function loadChainActors(page = 1) {
     try {
         showTableLoading('actors-tbody');
-        const baseUrl = getApiUrl('/chain-actors');
-        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const url = `${API_BASE_URL}/chain-actors?page=${page}&per_page=10`;
         const response = await fetch(url);
         const data = await response.json();
         
@@ -540,8 +546,7 @@ async function loadChainActors(page = 1) {
 async function loadProductionSeasons(page = 1) {
     try {
         showTableLoading('seasons-tbody');
-        const baseUrl = getApiUrl('/production-seasons');
-        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const url = `${API_BASE_URL}/production-seasons?page=${page}&per_page=10`;
         const response = await fetch(url);
         const data = await response.json();
         
@@ -569,8 +574,7 @@ async function loadProductionSeasons(page = 1) {
 async function loadRiceBatches(page = 1) {
     try {
         showTableLoading('batches-tbody');
-        const baseUrl = getApiUrl('/rice-batches');
-        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const url = `${API_BASE_URL}/rice-batches?page=${page}&per_page=10`;
         const response = await fetch(url);
         const data = await response.json();
         
@@ -578,8 +582,43 @@ async function loadRiceBatches(page = 1) {
         const batchesData = data.data.data || data.data || [];
         const paginationInfo = data.data.current_page ? data.data : null;
         
+        // Fetch related data
+        const [chainActorsRes, milledRiceRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/chain-actors`),
+            fetch(`${API_BASE_URL}/milled-rice`)
+        ]);
+        
+        const chainActorsData = await chainActorsRes.json();
+        const milledRiceData = await milledRiceRes.json();
+        const usersData = { data: [] }; // No users endpoint yet
+        
+        // Create lookup maps
+        const chainActorsMap = {};
+        const milledRiceMap = {};
+        const usersMap = {};
+        
+        if (chainActorsData.data) {
+            (Array.isArray(chainActorsData.data) ? chainActorsData.data : []).forEach(actor => {
+                chainActorsMap[actor.id] = actor.name || actor.actor_name || '-';
+            });
+        }
+        
+        if (milledRiceData.data) {
+            (Array.isArray(milledRiceData.data) ? milledRiceData.data : []).forEach(milled => {
+                if (!milledRiceMap[milled.batch_id]) {
+                    milledRiceMap[milled.batch_id] = milled;
+                }
+            });
+        }
+        
+        if (usersData.data) {
+            (Array.isArray(usersData.data) ? usersData.data : []).forEach(user => {
+                usersMap[user.id] = user.name || user.email || '-';
+            });
+        }
+        
         currentData = batchesData;
-        renderRiceBatchesTable(batchesData);
+        renderRiceBatchesTable(batchesData, chainActorsMap, milledRiceMap, usersMap);
         
         // Render pagination if available
         if (paginationInfo) {
@@ -673,22 +712,15 @@ function setupTransactionHeaderControls() {
 async function loadMilledRice(page = 1) {
     try {
         showTableLoading('milled-tbody');
-        const baseUrl = getApiUrl('/milled-rice');
-        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const url = `${API_EXTERNAL_URL}/api/mobile/trace/milling/get-all`;
         const response = await fetch(url);
         const data = await response.json();
         
-        // Handle paginated response
-        const milledData = data.data.data || data.data || [];
-        const paginationInfo = data.data.current_page ? data.data : null;
+        // Handle response from external API
+        const milledData = data.data || [];
         
         currentData = milledData;
         renderMilledRiceTable(milledData);
-        
-        // Render pagination if available
-        if (paginationInfo) {
-            renderMilledPagination(paginationInfo);
-        }
         
         // Setup search
         setupMilledSearch();
@@ -696,20 +728,6 @@ async function loadMilledRice(page = 1) {
         console.error('Error loading milled rice:', error);
         showToast('Error loading milled rice', 'error');
         showTableError('milled-tbody', 'Error loading milled rice');
-    }
-}
-
-async function loadDryingData() {
-    try {
-        showTableLoading('drying-data-tbody');
-        const response = await fetchData('/drying-data');
-        currentData = response.data || [];
-        renderDryingDataTable(currentData);
-        setupDryingDataSearch();
-    } catch (error) {
-        console.error('Error loading drying data:', error);
-        showToast('Error loading drying data', 'error');
-        showTableError('drying-data-tbody', 'Error loading drying data');
     }
 }
 
@@ -821,6 +839,9 @@ function renderChainActorsTable(data) {
             <td class="action-buttons">
                 <button class="btn btn-sm btn-warning" onclick="openChainActorModal('edit', ${actor.id})">
                     <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteEntity('chain_actors', ${actor.id})">
+                    <i class="fas fa-trash"></i>
                 </button>
             </td>
         `;
@@ -946,6 +967,7 @@ function renderSeasonsPagination(paginationInfo) {
         pageNumbers = [1];
         const startPage = Math.max(2, currentPage - 2);
         const endPage = Math.min(lastPage - 1, currentPage + 2);
+
         if (startPage > 2) pageNumbers.push('...');
         for (let i = startPage; i <= endPage; i++) {
             pageNumbers.push(i);
@@ -994,6 +1016,7 @@ function renderSeasonsPagination(paginationInfo) {
             </nav>
         </div>
     `;
+
     paginationContainer.innerHTML = html;
     const perPageSelect = document.getElementById('seasons-per-page');
     if (perPageSelect) {
@@ -1041,39 +1064,55 @@ function renderProductionSeasonsTable(data) {
                 <button class="btn btn-sm btn-warning" onclick="editEntity('production_seasons', ${season.id})">
                     <i class="fas fa-edit"></i>
                 </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteEntity('production_seasons', ${season.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
             </td>
         `;
         tbody.appendChild(row);
     });
 }
 
-function renderRiceBatchesTable(data) {
+function renderRiceBatchesTable(data, chainActorsMap = {}, milledRiceMap = {}, usersMap = {}) {
     const tbody = document.getElementById('batches-tbody');
     tbody.innerHTML = '';
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No rice batches found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No rice batches found</td></tr>';
         return;
     }
 
     data.forEach(batch => {
         const row = document.createElement('tr');
-        const holderName = batch.current_holder?.name || '-';
-        const variety = batch.season?.variety || '-';
-        const statusBadge = `<span class="badge bg-${batch.status === 'for_sale' ? 'success' : batch.status === 'pending' ? 'warning' : 'secondary'}">${batch.status || '-'}</span>`;
+        const seasonName = batch.season_name || '-';
+        const currentHolder = chainActorsMap[batch.farmer_id] || batch.farmer_name || '-';
+        
+        // Get milling data for this batch
+        const milledData = milledRiceMap[batch.id];
+        const millingName = milledData ? (chainActorsMap[milledData.miller_id] || milledData.miller_name || '-') : '-';
+        
+        // Get drying data (from milled rice if available)
+        const dryingName = milledData ? (milledData.dryer_name || '-') : '-';
+        
+        // Get validator name
+        const validatorName = usersMap[batch.validator_id] || '-';
         
         row.innerHTML = `
             <td>${batch.id}</td>
-            <td>${batch.qr_code ? batch.qr_code.substring(0, 8) + '...' : '-'}</td>
-            <td>${batch.batch_weight_kg || '-'} kg</td>
-            <td>${batch.moisture_content || '-'}%</td>
-            <td>${variety}</td>
-            <td>${holderName}</td>
-            <td>₱${batch.price_per_kg || '-'}</td>
-            <td>${statusBadge}</td>
+            <td>${batch.quantity_kg || '-'} kg</td>
+            <td>${batch.harvest_date ? new Date(batch.harvest_date).toLocaleDateString() : '-'}</td>
+            <td>${seasonName}</td>
+            <td>${currentHolder}</td>
+            <td>${millingName}</td>
+            <td>${dryingName}</td>
+            <td>${validatorName}</td>
+            <td>${batch.quality_score || '-'}</td>
             <td class="action-buttons">
                 <button class="btn btn-sm btn-warning" onclick="editEntity('rice_batches', ${batch.id})">
                     <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteEntity('rice_batches', ${batch.id})">
+                    <i class="fas fa-trash"></i>
                 </button>
             </td>
         `;
@@ -1189,6 +1228,9 @@ function renderMilledRiceTable(data) {
                 <button class="btn btn-sm btn-warning" onclick="editEntity('milled_rice', ${milled.id})">
                     <i class="fas fa-edit"></i>
                 </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteEntity('milled_rice', ${milled.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
             </td>
         `;
         tbody.appendChild(row);
@@ -1212,6 +1254,7 @@ function renderMilledPagination(paginationInfo) {
         pageNumbers = [1];
         const startPage = Math.max(2, currentPage - 2);
         const endPage = Math.min(lastPage - 1, currentPage + 2);
+
         if (startPage > 2) pageNumbers.push('...');
         for (let i = startPage; i <= endPage; i++) {
             pageNumbers.push(i);
@@ -1693,14 +1736,9 @@ function renderTransactionPagination() {
                             <i class="fas fa-chevron-left"></i>
                         </a>
                     </li>
-                    ${pageNumbers.map(pageNum => {
-        if (pageNum === '...') {
-            return `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-        }
-        return `<li class="page-item ${pageNum === currentPage ? 'active' : ''}">
+                    ${pageNumbers.map(pageNum => pageNum === '...' ? `<li class="page-item disabled"><span class="page-link">...</span></li>` : `<li class="page-item ${pageNum === currentPage ? 'active' : ''}">
                             <a class="page-link" href="#" onclick="changeTransactionPage(${pageNum}); return false;">${pageNum}</a>
-                        </li>`;
-    }).join('')}
+                        </li>`).join('')}
                     <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
                         <a class="page-link" href="#" onclick="changeTransactionPage(${currentPage + 1}); return false;" title="Next Page">
                             <i class="fas fa-chevron-right"></i>
@@ -1811,45 +1849,10 @@ function copyToClipboard(text) {
     const decodedText = text.startsWith('http') ? text : decodeURIComponent(text);
     navigator.clipboard.writeText(decodedText).then(() => {
         showToast('Copied to clipboard!', 'success');
-    }).catch(() => {
+    }).catch((error) => {
+        console.error('Error copying to clipboard:', error);
         showToast('Failed to copy to clipboard', 'error');
     });
-}
-
-// Modal Functions
-async function openModal(mode, entityType = null, id = null) {
-    isEditing = mode === 'edit';
-    editingId = id;
-
-    const modal = new bootstrap.Modal(document.getElementById('entityModal'));
-    const modalTitle = document.getElementById('modalTitle');
-    const formFields = document.getElementById('formFields');
-
-    modalTitle.textContent = isEditing ? 'Edit ' + getCurrentEntityDisplayName() : 'Add New ' + getCurrentEntityDisplayName();
-
-    // Load dynamic options for all forms that need them
-    await loadFormOptions();
-
-    // Generate form fields based on current entity
-    formFields.innerHTML = generateFormFields(currentEntity);
-
-    // If editing, populate form with existing data
-    if (isEditing && id) {
-        populateForm(id);
-    }
-
-    modal.show();
-
-    // Setup search listeners for search fields
-    setupFormSearchListeners();
-    
-    // Setup file input preview for photo_url
-    setupFileInputPreview();
-    
-    // Display prefilled photos if editing
-    if (isEditing) {
-        displayPrefillPhotos();
-    }
 }
 
 function setupFileInputPreview() {
@@ -1966,7 +1969,10 @@ function generateChainActorFormFields() {
             </div>
             <div class="col-md-6 mb-3">
                 <label for="actor_contact_number" class="form-label">Contact Number</label>
-                <input type="text" class="form-control" id="actor_contact_number">
+                <div class="input-group">
+                    <span class="input-group-text">+63</span>
+                    <input type="text" class="form-control" id="actor_contact_number" placeholder="9XXXXXXXXX" inputmode="numeric">
+                </div>
             </div>
         </div>
         <div class="row">
@@ -1997,46 +2003,71 @@ function generateChainActorFormFields() {
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="actor_farmer_id" class="form-label">Farmer ID</label>
-                <input type="number" class="form-control" id="actor_farmer_id" placeholder="Enter farmer ID">
+                <label for="actor_farmer_id" class="form-label">Farmer</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="actor_farmer_id" placeholder="Search farmer...">
+                    <button class="btn btn-outline-secondary" type="button" id="actor_farmer_id_search">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <small class="text-muted d-block mt-1" id="actor_farmer_id_display"></small>
+                <div id="actor_farmer_id_dropdown" class="dropdown-menu" style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 1000;"></div>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="actor_farm_id" class="form-label">Farm ID</label>
-                <input type="number" class="form-control" id="actor_farm_id" placeholder="Enter farm ID">
+                <label for="actor_farm_id" class="form-label">Farm</label>
+                <select class="form-select" id="actor_farm_id" disabled>
+                    <option value="">Select Farm</option>
+                    <option value="farm_1">Farm 1</option>
+                    <option value="farm_2">Farm 2</option>
+                    <option value="farm_3">Farm 3</option>
+                    <option value="farm_4">Farm 4</option>
+                </select>
             </div>
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="actor_assigned_tps" class="form-label">Assigned TPS</label>
-                <input type="number" class="form-control" id="actor_assigned_tps" placeholder="Enter TPS ID">
+                <label for="actor_assigned_tps" class="form-label">Assign TPS</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="actor_assigned_tps" placeholder="Search TPS...">
+                    <button class="btn btn-outline-secondary" type="button" id="actor_assigned_tps_search">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <small class="text-muted d-block mt-1" id="actor_assigned_tps_display"></small>
+                <div id="actor_assigned_tps_dropdown" class="dropdown-menu" style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 1000;"></div>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="actor_balance" class="form-label">Balance</label>
-                <div class="input-group">
-                    <span class="input-group-text">₱</span>
-                    <input type="number" class="form-control" id="actor_balance" placeholder="0.00" step="0.01" readonly>
-                </div>
-                <small class="text-muted">Read-only field</small>
+                <label for="actor_is_active" class="form-label">Status</label>
+                <select class="form-select" id="actor_is_active">
+                    <option value="1">Active</option>
+                    <option value="0">Inactive</option>
+                </select>
             </div>
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="actor_pin" class="form-label">PIN</label>
-                <input type="password" class="form-control" id="actor_pin" placeholder="Enter PIN">
-            </div>
-            <div class="col-md-6 mb-3">
-                <label for="actor_address" class="form-label">Address</label>
-                <textarea class="form-control" id="actor_address" rows="2" placeholder="Enter address or location details"></textarea>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="actor_is_active" checked>
-                    <label class="form-check-label" for="actor_is_active">
-                        Active
-                    </label>
+                <div class="input-group" id="pin_container">
+                    <input type="text" class="form-control pin-box" maxlength="1" inputmode="numeric" >
+                    <input type="text" class="form-control pin-box" maxlength="1" inputmode="numeric" >
+                    <input type="text" class="form-control pin-box" maxlength="1" inputmode="numeric" >
+                    <input type="text" class="form-control pin-box" maxlength="1" inputmode="numeric" >
+                    <input type="text" class="form-control pin-box" maxlength="1" inputmode="numeric" >
+                    <input type="text" class="form-control pin-box" maxlength="1" inputmode="numeric" >
                 </div>
+                <input type="hidden" id="actor_pin" value="">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="actor_address" class="form-label">Address Name</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="actor_address" placeholder="e.g., Home, Office, Farm">
+                    <button class="btn btn-outline-secondary" type="button" id="actor_pick_location" title="Pick location">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </button>
+                </div>
+                <small class="text-muted d-block mt-1">Location will be saved with coordinates</small>
+                <input type="hidden" id="actor_location_lat" value="">
+                <input type="hidden" id="actor_location_lng" value="">
             </div>
         </div>
     `;
@@ -2062,29 +2093,54 @@ async function populateChainActorForm(id) {
     if (organizationEl) organizationEl.value = actor.organization || '';
     
     const farmerIdEl = document.getElementById('actor_farmer_id');
-    if (farmerIdEl) farmerIdEl.value = actor.farmer_id || '';
+    if (farmerIdEl && actor.farmer_id) {
+        farmerIdEl.value = actor.farmer_id;
+        farmerIdEl.dataset.userId = actor.farmer_id;
+        const farmerDisplayEl = document.getElementById('actor_farmer_id_display');
+        if (farmerDisplayEl) {
+            farmerDisplayEl.textContent = `ID: ${actor.farmer_id}`;
+        }
+    }
     
     const farmIdEl = document.getElementById('actor_farm_id');
     if (farmIdEl) farmIdEl.value = actor.farm_id || '';
     
     const assignedTpsEl = document.getElementById('actor_assigned_tps');
-    if (assignedTpsEl) assignedTpsEl.value = actor.assigned_tps || '';
+    if (assignedTpsEl && actor.assigned_tps) {
+        assignedTpsEl.value = actor.assigned_tps;
+        assignedTpsEl.dataset.userId = actor.assigned_tps;
+        const tpsDisplayEl = document.getElementById('actor_assigned_tps_display');
+        if (tpsDisplayEl) {
+            tpsDisplayEl.textContent = `ID: ${actor.assigned_tps}`;
+        }
+    }
     
-    const balanceEl = document.getElementById('actor_balance');
-    if (balanceEl) balanceEl.value = actor.balance || '0.00';
-    
+    // Populate PIN boxes
     const pinEl = document.getElementById('actor_pin');
-    if (pinEl) pinEl.value = actor.pin || '';
+    if (pinEl && actor.pin) {
+        const pinValue = actor.pin.toString();
+        const pinBoxes = document.querySelectorAll('.pin-box');
+        pinBoxes.forEach((box, index) => {
+            box.value = pinValue[index] || '';
+        });
+        pinEl.value = pinValue;
+    }
     
     // Parse address if it's a JSON string
     let addressValue = '';
+    let latitude = '';
+    let longitude = '';
     if (actor.address) {
         try {
             if (typeof actor.address === 'string') {
                 const addressObj = JSON.parse(actor.address);
                 addressValue = addressObj.name || '';
+                latitude = addressObj.latitude || '';
+                longitude = addressObj.longitude || '';
             } else {
                 addressValue = actor.address.name || '';
+                latitude = actor.address.latitude || '';
+                longitude = actor.address.longitude || '';
             }
         } catch (e) {
             addressValue = actor.address || '';
@@ -2093,8 +2149,14 @@ async function populateChainActorForm(id) {
     const addressEl = document.getElementById('actor_address');
     if (addressEl) addressEl.value = addressValue;
     
+    const latEl = document.getElementById('actor_location_lat');
+    if (latEl) latEl.value = latitude;
+    
+    const lngEl = document.getElementById('actor_location_lng');
+    if (lngEl) lngEl.value = longitude;
+    
     const activeEl = document.getElementById('actor_is_active');
-    if (activeEl) activeEl.checked = actor.is_active !== false;
+    if (activeEl) activeEl.value = actor.is_active ? '1' : '0';
     
     // Handle actor types
     if (actor.actor_type) {
@@ -2155,28 +2217,79 @@ function setupChainActorFormListeners() {
         });
     }
 
-    // Farmer ID search
+    // Farmer ID search - auto search on typing
     const farmerIdInput = document.getElementById('actor_farmer_id');
-    const farmerIdSearchBtn = document.getElementById('actor_farmer_id_search');
-    if (farmerIdInput && farmerIdSearchBtn) {
-        farmerIdSearchBtn.addEventListener('click', () => searchUsers(farmerIdInput.value, 'actor_farmer_id_dropdown', 'actor_farmer_id'));
+    if (farmerIdInput) {
+        let farmerSearchTimeout;
         farmerIdInput.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') {
-                searchUsers(farmerIdInput.value, 'actor_farmer_id_dropdown', 'actor_farmer_id');
+            clearTimeout(farmerSearchTimeout);
+            const query = farmerIdInput.value.trim();
+            if (query.length >= 2) {
+                farmerSearchTimeout = setTimeout(() => {
+                    searchUsers(query, 'actor_farmer_id_dropdown', 'actor_farmer_id');
+                }, 300);
+            } else if (query.length === 0) {
+                document.getElementById('actor_farmer_id_dropdown').style.display = 'none';
             }
         });
     }
 
-    // Assign TPS search
-    const assignTpsInput = document.getElementById('actor_assign_tps');
-    const assignTpsSearchBtn = document.getElementById('actor_assign_tps_search');
-    if (assignTpsInput && assignTpsSearchBtn) {
-        assignTpsSearchBtn.addEventListener('click', () => searchUsers(assignTpsInput.value, 'actor_assign_tps_dropdown', 'actor_assign_tps'));
+    // Assign TPS search - auto search on typing
+    const assignTpsInput = document.getElementById('actor_assigned_tps');
+    if (assignTpsInput) {
+        let tpsSearchTimeout;
         assignTpsInput.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') {
-                searchUsers(assignTpsInput.value, 'actor_assign_tps_dropdown', 'actor_assign_tps');
+            clearTimeout(tpsSearchTimeout);
+            const query = assignTpsInput.value.trim();
+            if (query.length >= 2) {
+                tpsSearchTimeout = setTimeout(() => {
+                    searchUsers(query, 'actor_assigned_tps_dropdown', 'actor_assigned_tps');
+                }, 300);
+            } else if (query.length === 0) {
+                document.getElementById('actor_assigned_tps_dropdown').style.display = 'none';
             }
         });
+    }
+
+    // PIN box navigation
+    const pinBoxes = document.querySelectorAll('.pin-box');
+    pinBoxes.forEach((box, index) => {
+        box.addEventListener('keyup', (e) => {
+            if (e.key === 'Backspace') {
+                box.value = '';
+                if (index > 0) pinBoxes[index - 1].focus();
+            } else if (/^\d$/.test(e.key)) {
+                box.value = e.key;
+                if (index < pinBoxes.length - 1) pinBoxes[index + 1].focus();
+                updatePinValue();
+            }
+        });
+        
+        box.addEventListener('input', (e) => {
+            if (e.target.value.length > 1) {
+                e.target.value = e.target.value.slice(-1);
+            }
+            if (/^\d$/.test(e.target.value) && index < pinBoxes.length - 1) {
+                pinBoxes[index + 1].focus();
+            }
+            updatePinValue();
+        });
+    });
+
+    // Pick location button
+    const pickLocationBtn = document.getElementById('actor_pick_location');
+    if (pickLocationBtn) {
+        pickLocationBtn.addEventListener('click', () => openLocationPicker());
+    }
+}
+
+// Update PIN value from boxes
+function updatePinValue() {
+    const pinBoxes = document.querySelectorAll('.pin-box');
+    const pinValue = Array.from(pinBoxes).map(box => box.value).join('');
+    const pinInput = document.getElementById('actor_pin');
+    if (pinInput) {
+        pinInput.value = pinValue;
     }
 }
 
@@ -2187,7 +2300,7 @@ async function searchUsers(query, dropdownId, inputId) {
     }
 
     try {
-        const response = await fetch(`${API_EXTERNAL_URL}/api/mobile/get-all-users/${encodeURIComponent(query)}`);
+        const response = await fetch(`${API_BASE_URL}/chain-actors/search-users?query=${encodeURIComponent(query)}`);
         const data = await response.json();
         
         const dropdown = document.getElementById(dropdownId);
@@ -2210,10 +2323,20 @@ async function searchUsers(query, dropdownId, inputId) {
                     displayName = `${firstName} ${lastName}`.trim();
                 }
                 
-                item.innerHTML = `${displayName || userId}`;
+                item.innerHTML = `<div><strong>${displayName || userId}</strong><br><small class="text-muted">ID: ${userId}</small></div>`;
                 item.addEventListener('click', () => {
                     const inputEl = document.getElementById(inputId);
-                    inputEl.value = userId;
+                    inputEl.value = displayName || userId;
+                    
+                    // Update display field with ID
+                    const displayFieldId = inputId + '_display';
+                    const displayEl = document.getElementById(displayFieldId);
+                    if (displayEl) {
+                        displayEl.textContent = `ID: ${userId}`;
+                    }
+                    
+                    // Store the actual ID in a data attribute for submission
+                    inputEl.dataset.userId = userId;
                     dropdown.style.display = 'none';
                 });
                 dropdown.appendChild(item);
@@ -2230,33 +2353,77 @@ async function searchUsers(query, dropdownId, inputId) {
 }
 
 // Perform search for form fields
-function performSearchFieldSearch(query, dropdownId, inputId, options) {
+async function performSearchFieldSearch(query, dropdownId, inputId, fieldType) {
     const dropdown = document.getElementById(dropdownId);
     if (!dropdown) return;
     
-    // Filter options based on query
-    const filtered = options.filter(opt => 
-        opt.label.toLowerCase().includes(query.toLowerCase()) ||
-        opt.value.toString().includes(query)
-    );
-    
-    if (filtered.length > 0) {
-        dropdown.innerHTML = '';
-        filtered.forEach(option => {
-            const item = document.createElement('div');
-            item.className = 'dropdown-item';
-            item.style.cursor = 'pointer';
-            item.innerHTML = `${option.label} (ID: ${option.value})`;
-            item.addEventListener('click', () => {
-                const inputEl = document.getElementById(inputId);
-                inputEl.value = option.value;
-                dropdown.style.display = 'none';
-            });
-            dropdown.appendChild(item);
-        });
-        dropdown.style.display = 'block';
-    } else {
-        dropdown.innerHTML = '<div class="dropdown-item text-muted">No results found</div>';
+    try {
+        // For farmer and validator fields, use external API
+        if (fieldType === 'farmer' || fieldType === 'validator') {
+            const externalApiUrl = 'https://ds.capiroso.site/api';
+            const response = await fetch(`${externalApiUrl}/mobile/get-all-users?search=${encodeURIComponent(query)}`);
+            const data = await response.json();
+            
+            if (data.data && Array.isArray(data.data)) {
+                dropdown.innerHTML = '';
+                data.data.forEach(user => {
+                    const item = document.createElement('div');
+                    item.className = 'dropdown-item';
+                    item.style.cursor = 'pointer';
+                    
+                    // Extract name from nested user object
+                    let displayName = user.name || user.full_name || '';
+                    if (!displayName && user.user) {
+                        const firstName = user.user.first_name || '';
+                        const lastName = user.user.last_name || '';
+                        displayName = `${firstName} ${lastName}`.trim();
+                    }
+                    
+                    let userId = user.id || user.user_id;
+                    item.innerHTML = `<div><strong>${displayName || userId}</strong><br><small class="text-muted">ID: ${userId}</small></div>`;
+                    item.addEventListener('click', () => {
+                        const inputEl = document.getElementById(inputId);
+                        inputEl.value = userId;
+                        dropdown.style.display = 'none';
+                    });
+                    dropdown.appendChild(item);
+                });
+                dropdown.style.display = 'block';
+            } else {
+                dropdown.innerHTML = '<div class="dropdown-item text-muted">No results found</div>';
+                dropdown.style.display = 'block';
+            }
+        } else {
+            // For other fields, use local options
+            const options = transactionFormOptions[fieldType] || [];
+            const filtered = options.filter(opt => 
+                opt.label.toLowerCase().includes(query.toLowerCase()) ||
+                opt.value.toString().includes(query)
+            );
+            
+            if (filtered.length > 0) {
+                dropdown.innerHTML = '';
+                filtered.forEach(option => {
+                    const item = document.createElement('div');
+                    item.className = 'dropdown-item';
+                    item.style.cursor = 'pointer';
+                    item.innerHTML = `${option.label} (ID: ${option.value})`;
+                    item.addEventListener('click', () => {
+                        const inputEl = document.getElementById(inputId);
+                        inputEl.value = option.value;
+                        dropdown.style.display = 'none';
+                    });
+                    dropdown.appendChild(item);
+                });
+                dropdown.style.display = 'block';
+            } else {
+                dropdown.innerHTML = '<div class="dropdown-item text-muted">No results found</div>';
+                dropdown.style.display = 'block';
+            }
+        }
+    } catch (error) {
+        console.error('Error searching:', error);
+        dropdown.innerHTML = '<div class="dropdown-item text-muted">Error searching</div>';
         dropdown.style.display = 'block';
     }
 }
@@ -2271,7 +2438,7 @@ function setupFormSearchListeners() {
         farmerIdSearchBtn.addEventListener('click', () => {
             const query = farmerIdInput.value;
             if (query && query.trim().length >= 2) {
-                performSearchFieldSearch(query, 'farmer_id_dropdown', 'farmer_id', transactionFormOptions.farmers);
+                performSearchFieldSearch(query, 'farmer_id_dropdown', 'farmer_id', 'farmer');
             } else {
                 showToast('Please enter at least 2 characters', 'warning');
             }
@@ -2281,7 +2448,7 @@ function setupFormSearchListeners() {
             if (e.key === 'Enter') {
                 const query = farmerIdInput.value;
                 if (query && query.trim().length >= 2) {
-                    performSearchFieldSearch(query, 'farmer_id_dropdown', 'farmer_id', transactionFormOptions.farmers);
+                    performSearchFieldSearch(query, 'farmer_id_dropdown', 'farmer_id', 'farmer');
                 }
             }
         });
@@ -2295,7 +2462,7 @@ function setupFormSearchListeners() {
         validatorIdSearchBtn.addEventListener('click', () => {
             const query = validatorIdInput.value;
             if (query && query.trim().length >= 2) {
-                performSearchFieldSearch(query, 'validator_id_dropdown', 'validator_id', transactionFormOptions.validators);
+                performSearchFieldSearch(query, 'validator_id_dropdown', 'validator_id', 'validator');
             } else {
                 showToast('Please enter at least 2 characters', 'warning');
             }
@@ -2305,7 +2472,7 @@ function setupFormSearchListeners() {
             if (e.key === 'Enter') {
                 const query = validatorIdInput.value;
                 if (query && query.trim().length >= 2) {
-                    performSearchFieldSearch(query, 'validator_id_dropdown', 'validator_id', transactionFormOptions.validators);
+                    performSearchFieldSearch(query, 'validator_id_dropdown', 'validator_id', 'validator');
                 }
             }
         });
@@ -2329,32 +2496,50 @@ async function saveChainActor() {
         }
 
         // Collect form data
+        const addressName = document.getElementById('actor_address').value || '';
+        const latitude = document.getElementById('actor_location_lat').value || '';
+        const longitude = document.getElementById('actor_location_lng').value || '';
+        
+        // Build address object with name and coordinates
+        let addressData = null;
+        if (addressName || latitude || longitude) {
+            addressData = {
+                name: addressName,
+                latitude: latitude,
+                longitude: longitude
+            };
+        }
+        
+        // Get actual IDs from data attributes (set during search selection)
+        const farmerIdEl = document.getElementById('actor_farmer_id');
+        const assignedTpsEl = document.getElementById('actor_assigned_tps');
+        
         const formData = {
             name: name,
             actor_type: type.split(',').filter(t => t.trim()),
             contact_number: document.getElementById('actor_contact_number').value || null,
             organization: document.getElementById('actor_organization').value || null,
-            farmer_id: document.getElementById('actor_farmer_id').value || null,
+            farmer_id: farmerIdEl.dataset.userId || farmerIdEl.value || null,
             farm_id: document.getElementById('actor_farm_id').value || null,
-            assigned_tps: document.getElementById('actor_assigned_tps').value || null,
+            assigned_tps: assignedTpsEl.dataset.userId || assignedTpsEl.value || null,
             pin: document.getElementById('actor_pin').value || null,
-            address: document.getElementById('actor_address').value || null,
-            is_active: document.getElementById('actor_is_active').checked ? 1 : 0
+            address: addressData ? JSON.stringify(addressData) : null,
+            is_active: parseInt(document.getElementById('actor_is_active').value)
         };
 
         showLoading(true);
 
         // Call external API upsert endpoint
-        const endpoint = isEditing ? `/actor/upsert/${editingId}` : '/actor/upsert';
-        const response = await fetch(`${API_EXTERNAL_URL}/api/mobile/trace${endpoint}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        });
+        const endpoint = isEditing ? `/chain-actors/${editingId}` : '/chain-actors';
+        const url = `${API_BASE_URL}${endpoint}`;
+        const response = isEditing
+            ? await axios.put(url, formData)
+            : await axios.post(url, formData);
 
-        const result = await response.json();
+        const result = response.data;
+
+        console.log('API Response:', result);
+        console.log('Response Status:', response.status);
 
         if (result.success) {
             showToast(isEditing ? 'Actor updated successfully' : 'Actor created successfully', 'success');
@@ -2367,10 +2552,45 @@ async function saveChainActor() {
         }
     } catch (error) {
         console.error('Error saving chain actor:', error);
-        showToast('Error saving chain actor', 'error');
+        const message = error.response?.data?.message || 'Error saving chain actor';
+        showToast(message, 'error');
     } finally {
         showLoading(false);
     }
+}
+
+// Open location picker for address field
+function openLocationPicker() {
+    // Check if geolocation is available
+    if (!navigator.geolocation) {
+        showToast('Geolocation is not supported by your browser', 'error');
+        return;
+    }
+
+    showLoading(true);
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude, longitude } = position.coords;
+            const latEl = document.getElementById('actor_location_lat');
+            const lngEl = document.getElementById('actor_location_lng');
+            
+            if (latEl && lngEl) {
+                // Store latitude and longitude in hidden fields
+                latEl.value = latitude;
+                lngEl.value = longitude;
+                
+                showToast(`Location picked: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, 'success');
+            }
+            
+            showLoading(false);
+        },
+        (error) => {
+            console.error('Geolocation error:', error);
+            showToast('Unable to get your location. Please check permissions.', 'error');
+            showLoading(false);
+        }
+    );
 }
 
 // Remove chip
@@ -2386,7 +2606,7 @@ function removeChip(fieldName, value) {
 function updateHiddenInput(fieldName) {
     const chipsContainer = document.getElementById(`${fieldName}_chips`);
     const hiddenInput = document.getElementById(fieldName);
-    const values = Array.from(chipsContainer.querySelectorAll('.chip')).map(chip => chip.getAttribute('data-value'));
+    const values = Array.from(chipsContainer.querySelectorAll('[data-value]')).map(chip => chip.getAttribute('data-value'));
     hiddenInput.value = values.join(',');
 }
 
@@ -2514,21 +2734,24 @@ function generateFieldInput(field) {
                     </div>`;
         case 'select':
             let options = '';
-            field.options.forEach(option => {
-                const selected = field.defaultValue === option.value ? 'selected' : '';
-                options += `<option value="${option.value}" ${selected}>${option.label}</option>`;
-            });
+            if (field.options && Array.isArray(field.options)) {
+                field.options.forEach(option => {
+                    const selected = field.defaultValue === option.value ? 'selected' : '';
+                    options += `<option value="${option.value}" ${selected}>${option.label}</option>`;
+                });
+            }
             return `<select class="form-select form-select-sm border-1" id="${field.name}" ${field.required ? 'required' : ''}>
                         ${!field.defaultValue ? `<option value="">Select ${field.label}</option>` : ''}
                         ${options}
                     </select>`;
         case 'multiselect':
+            const multiOptions = field.options && Array.isArray(field.options) ? field.options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('') : '';
             return `<div class="multiselect-container" id="${field.name}_container">
                         <input type="hidden" id="${field.name}" value="">
                         <div class="multiselect-chips mb-2" id="${field.name}_chips"></div>
-                        <select class="form-select form-select-sm border-1 multiselect-dropdown" id="${field.name}_dropdown">
+                        <select class="form-select form-select-sm multiselect-dropdown" id="${field.name}_dropdown">
                             <option value="">Add ${field.label}</option>
-                            ${field.options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')}
+                            ${multiOptions}
                         </select>
                     </div>`;
         case 'chips':
@@ -2632,33 +2855,32 @@ function getEntityFields(entityType) {
             { name: 'moisture_content', label: 'Moisture Content (%)', type: 'number', required: false, step: '0.01' },
             { name: 'fertilizer_used', label: 'Fertilizer Used', type: 'chips', required: false },
             { name: 'pesticide_used', label: 'Pesticide Used', type: 'chips', required: false },
-            { name: 'carbon_smart_certified', label: 'Carbon Smart Certified', type: 'checkbox', required: false }
-        ],
-        'rice_batches': [
-            { name: 'batch_number', label: 'Batch Number', type: 'text', required: false, placeholder: 'Auto-generated if empty' },
-            { name: 'farmer_id', label: 'Farmer', type: 'search', required: true },
-            { name: 'season_id', label: 'Production Season', type: 'select', required: true, options: transactionFormOptions.seasons },
-            { name: 'batch_weight_kg', label: 'Batch Weight (kg)', type: 'number', required: false },
-            { name: 'moisture_content', label: 'Moisture Content (%)', type: 'number', required: false, step: '0.01' },
-            { name: 'price_per_kg', label: 'Price per kg (₱)', type: 'number', required: false, step: '0.01' },
-            { name: 'current_holder_id', label: 'Current Holder', type: 'select', required: false, options: transactionFormOptions.actors },
-            { name: 'milling_id', label: 'Milling', type: 'select', required: false, options: transactionFormOptions.millings },
-            { name: 'drying_id', label: 'Drying', type: 'select', required: false, options: transactionFormOptions.dryings },
-            { name: 'validator_id', label: 'Validator', type: 'search', required: false },
-            {
-                name: 'status', label: 'Status', type: 'select', required: false,
+            { 
+                name: 'carbon_smart_certified', label: 'Carbon Smart Certified', type: 'select', required: false, defaultValue: '0',
                 options: [
-                    { value: 'for_sale', label: 'For Sale' },
-                    { value: 'stock', label: 'Stock' },
-                    { value: 'consumed', label: 'Consumed' }
+                    { value: '0', label: 'No' },
+                    { value: '1', label: 'Yes' }
                 ]
             }
         ],
+        'rice_batches': [
+            { name: 'farmer_id', label: 'Farmer', type: 'search', required: true },
+            { name: 'season_id', label: 'Production Season', type: 'select', required: true, options: transactionFormOptions.seasons },
+            { name: 'weight', label: 'Weight (kg)', type: 'number', required: true, step: '0.01', placeholder: 'e.g., 15' },
+            { name: 'moisture_content', label: 'Moisture Content (%)', type: 'number', required: true, step: '0.01', placeholder: 'e.g., 14' },
+            { name: 'price_per_kg', label: 'Price per kg (₱)', type: 'number', required: true, step: '0.01', placeholder: 'e.g., 50' },
+            { name: 'batch_weight_kg', label: 'Batch Weight (kg)', type: 'number', required: false, step: '0.01' },
+            { name: 'current_holder_id', label: 'Current Holder', type: 'select', required: false, options: transactionFormOptions.actors },
+            { name: 'milling_id', label: 'Milling', type: 'select', required: false, options: transactionFormOptions.millings },
+            { name: 'drying_id', label: 'Drying', type: 'select', required: false, options: transactionFormOptions.dryings },
+            { name: 'validator_id', label: 'Validator', type: 'search', required: false }
+        ],
         'milled_rice': [
-            { name: 'farmer_id', label: 'Farmer ID', type: 'number', required: true, placeholder: 'e.g., 32' },
+            { name: 'batch_id', label: 'Batch', type: 'select', required: false, options: transactionFormOptions.batches },
+            { name: 'user_id', label: 'Actor', type: 'select', required: true, options: transactionFormOptions.actors },
             { name: 'total_weight_kg', label: 'Total Weight (kg)', type: 'number', required: true, placeholder: 'e.g., 15' },
             {
-                name: 'milling_type', label: 'Milling Type', type: 'select', required: true,
+                name: 'machine_type', label: 'Machine Type', type: 'select', required: true,
                 options: [
                     { value: 'Mobile Rice Mill', label: 'Mobile Rice Mill' },
                     { value: 'Stationary Rice Mill', label: 'Stationary Rice Mill' },
@@ -2667,7 +2889,7 @@ function getEntityFields(entityType) {
                 ]
             },
             {
-                name: 'quality', label: 'Quality', type: 'select', required: false,
+                name: 'quality_grade', label: 'Quality Grade', type: 'select', required: true,
                 options: [
                     { value: 'premium', label: 'Premium' },
                     { value: 'grade_a', label: 'Grade A' },
@@ -2675,10 +2897,12 @@ function getEntityFields(entityType) {
                     { value: 'standard', label: 'Standard' }
                 ]
             },
-            { name: 'moisture', label: 'Moisture (%)', type: 'number', required: false, step: '0.01', placeholder: 'e.g., 14.00' },
-            { name: 'total_weight_processed_kg', label: 'Total Weight Processed (kg)', type: 'number', required: false, placeholder: 'e.g., 14' },
+            { name: 'moisture_content', label: 'Moisture Content (%)', type: 'number', required: true, step: '0.01', placeholder: 'e.g., 14.00' },
+            { name: 'estimated_output_min', label: '', type: 'hidden', required: false, defaultValue: '10' },
+            { name: 'estimated_output_max', label: '', type: 'hidden', required: false, defaultValue: '14' },
+            { name: 'output', label: 'Actual Output (kg)', type: 'number', required: true, placeholder: 'e.g., 12' },
             { name: 'recovery', label: 'Recovery (%)', type: 'number', required: false, step: '0.01', placeholder: 'e.g., 0.00' },
-            { name: 'actual_price', label: 'Actual Price (₱)', type: 'number', required: false, step: '0.01', placeholder: 'e.g., 0.00' },
+            { name: 'actual_price', label: 'Total Milling Price (₱)', type: 'number', required: false, step: '0.01', placeholder: 'e.g., 0.00' },
             { name: 'comment', label: 'Comment', type: 'textarea', required: false, placeholder: 'Optional notes' },
             { name: 'photo_url', label: 'Photos', type: 'file', required: false, accept: 'image/*', multiple: true, maxFiles: 5 },
             { name: 'geotagging', label: 'Geotagging', type: 'text', required: false, placeholder: 'Optional location coordinates' }
@@ -2750,7 +2974,10 @@ function populateForm(id) {
                 }
             }
             
-            if (value !== undefined && value !== null) {
+            // For hidden fields, always set the value from entity or use defaultValue
+            if (field.type === 'hidden') {
+                input.value = value !== undefined && value !== null ? value : (field.defaultValue || '');
+            } else if (value !== undefined && value !== null) {
                 if (field.type === 'checkbox') {
                     input.checked = value === true || value === 1 || value === 'true';
                 } else if (field.type === 'chips') {
@@ -2776,7 +3003,12 @@ async function saveEntity() {
         const endpoint = getEntityEndpoint(currentEntity);
 
         let response;
-        if (isEditing) {
+        
+        // Special handling for entities with upsert pattern (POST for both create and update)
+        if (currentEntity === 'rice_batches' || currentEntity === 'milled_rice' || currentEntity === 'drying_data') {
+            const upsertEndpoint = `${endpoint}${isEditing ? `/${editingId}` : ''}`;
+            response = await createData(upsertEndpoint, formData);
+        } else if (isEditing) {
             response = await updateData(`${endpoint}/${editingId}`, formData);
         } else {
             response = await createData(endpoint, formData);
@@ -2829,10 +3061,25 @@ function collectFormData() {
             if (field.type === 'checkbox') {
                 data[field.name] = input.checked;
             } else if (field.type === 'multiselect' || field.type === 'chips') {
-                // Convert comma-separated values to array
-                data[field.name] = value ? value.split(',').filter(v => v.trim()) : [];
+                // For production seasons chips, keep as comma-separated string
+                if (currentEntity === 'production_seasons' && field.type === 'chips') {
+                    if (value) {
+                        data[field.name] = value;
+                    }
+                } else {
+                    // For other entities, convert to array
+                    const entries = value
+                        ? value
+                            .split(',')
+                            .map(v => v.trim())
+                            .filter(Boolean)
+                        : [];
+                    if (entries.length > 0) {
+                        data[field.name] = entries;
+                    }
+                }
             } else if (currentEntity === 'chain_transactions') {
-                if (field.name === 'batch_ids' && value) {
+                if (field.name === 'batch_id' && value) {
                     // Convert single batch ID to array
                     data[field.name] = [parseInt(value)];
                 } else if (field.name === 'payment_reference' && value) {
@@ -2841,14 +3088,64 @@ function collectFormData() {
                 } else if (field.name === 'transaction_date') {
                     // Use today's date
                     data[field.name] = new Date().toISOString().split('T')[0];
-                } else {
+                } else if (value !== null) {
                     data[field.name] = value;
                 }
+            } else if (currentEntity === 'drying_data' || currentEntity === 'milled_rice' || currentEntity === 'rice_batches') {
+                // For drying data, milled rice, and rice batches, include all fields even if empty (external API requires them)
+                // Convert empty strings to null for numeric fields
+                if (field.type === 'number') {
+                    data[field.name] = value ? parseFloat(value) : null;
+                } else if (field.type === 'hidden') {
+                    // For hidden fields, just add the value as-is
+                    data[field.name] = value || null;
+                } else if (currentEntity === 'rice_batches' && (field.name === 'farmer_id' || field.name === 'season_id' || field.name === 'current_holder_id' || field.name === 'milling_id' || field.name === 'drying_id' || field.name === 'validator_id')) {
+                    // Convert ID fields to integers for rice batches
+                    data[field.name] = value ? parseInt(value) : null;
+                } else {
+                    data[field.name] = value || null;
+                }
             } else {
-                data[field.name] = value;
+                // Only add field if it has a value
+                if (value !== null && value !== '') {
+                    data[field.name] = value;
+                }
             }
         }
     });
+
+    // For milled rice, set estimated_output_min and estimated_output_max to the same value as output
+    if (currentEntity === 'milled_rice') {
+        const outputValue = data.output;
+        data.estimated_output_min = outputValue;
+        data.estimated_output_max = outputValue;
+    }
+
+    if (currentEntity === 'production_seasons') {
+        const chipFields = ['fertilizer_used', 'pesticide_used'];
+        chipFields.forEach(fieldName => {
+            if (Array.isArray(data[fieldName])) {
+                if (data[fieldName].length > 0) {
+                    data[fieldName] = data[fieldName].join(',');
+                } else {
+                    delete data[fieldName];
+                }
+            } else if (typeof data[fieldName] === 'string' && data[fieldName].startsWith('[')) {
+                // Handle JSON array string
+                try {
+                    const parsed = JSON.parse(data[fieldName]);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        data[fieldName] = parsed.join(',');
+                    } else {
+                        delete data[fieldName];
+                    }
+                } catch (e) {
+                    // If parsing fails, delete the field
+                    delete data[fieldName];
+                }
+            }
+        });
+    }
 
     // Always add transaction_date for transactions
     if (currentEntity === 'chain_transactions') {
@@ -2864,16 +3161,37 @@ async function editEntity(entityType, id) {
     openModal('edit', entityType, id);
 }
 
+async function openTransactionModal() {
+    openModal('add', 'chain_transactions');
+}
+
 async function deleteEntity(entityType, id) {
     if (!confirm('Are you sure you want to delete this item?')) {
         return;
     }
 
     try {
-        const endpoint = getEntityEndpoint(entityType);
-        const response = await deleteData(`${endpoint}/${id}`);
+        // Map entity types to delete endpoints
+        const deleteEndpoints = {
+            'chain_actors': '/chain-actors',
+            'production_seasons': '/production-seasons',
+            'rice_batches': '/rice-batches',
+            'milled_rice': '/milled-rice',
+            'drying_data': '/drying-data'
+        };
 
-        if (response.success) {
+        const deleteEndpoint = deleteEndpoints[entityType];
+        if (!deleteEndpoint) {
+            showToast('Unknown entity type', 'error');
+            return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}${deleteEndpoint}/${id}`, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+
+        if (response.ok || data.success) {
             showToast('Deleted successfully', 'success');
 
             // Reload current section data
@@ -2900,7 +3218,7 @@ async function deleteEntity(entityType, id) {
                     loadChainActors();
             }
         } else {
-            showToast(response.error || 'Delete failed', 'error');
+            showToast(data.error || 'Delete failed', 'error');
         }
     } catch (error) {
         console.error('Error deleting entity:', error);
@@ -2916,7 +3234,6 @@ function getApiUrl(endpoint) {
     }
     // Map endpoints to external API paths
     const externalEndpoints = {
-        '/chain-actors': '/api/mobile/trace/actor/get-all',
         '/rice-batches': '/api/mobile/trace/batch/get-all',
         '/milled-rice': '/api/mobile/trace/milling/get-all',
         '/production-seasons': '/api/mobile/trace/season/get-all',
@@ -2937,25 +3254,43 @@ async function fetchData(endpoint) {
 }
 
 async function createData(endpoint, data) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-    });
-    return await response.json();
+    try {
+        const response = await axios.post(`${API_BASE_URL}${endpoint}`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Create request failed:', error);
+        return {
+            success: false,
+            error: error.response?.data?.message || 'Failed to create record'
+        };
+    }
 }
 
 async function updateData(endpoint, data) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-    });
-    return await response.json();
+    try {
+        const response = await axios.put(`${API_BASE_URL}${endpoint}`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Update request failed:', error);
+        return {
+            success: false,
+            error: error.response?.data?.message || 'Failed to update record'
+        };
+    }
+}
+
+async function upsertBatch(endpoint, data) {
+    try {
+        console.log('Sending upsert batch request:', { endpoint, data });
+        const response = await axios.post(`${API_BASE_URL}${endpoint}`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Upsert batch request failed:', error);
+        return {
+            success: false,
+            error: error.response?.data?.message || 'Failed to upsert batch'
+        };
+    }
 }
 
 async function deleteData(endpoint) {
@@ -3147,25 +3482,6 @@ function initializeApiTester() {
         loadEndpointTemplate(endpoint);
     }
 
-    function loadEndpointTemplate(endpoint) {
-        const template = endpointTemplates[endpoint];
-        if (template) {
-            // Clear existing data
-            clearHeadersTable();
-            clearBodyTable();
-
-            // Load headers
-            template.headers.forEach(header => {
-                addHeaderRow(header.name, header.value);
-            });
-
-            // Load body parameters
-            template.body.forEach(param => {
-                addBodyRow(param.name, param.value);
-            });
-        }
-    }
-
     methodSelect.addEventListener('change', updateUrl);
     endpointSelect.addEventListener('change', updateUrl);
 
@@ -3229,6 +3545,25 @@ function initializeApiTester() {
 
     function clearBodyTable() {
         document.getElementById('params-table-body').innerHTML = '';
+    }
+
+    function loadEndpointTemplate(endpoint) {
+        const template = endpointTemplates[endpoint];
+        if (!template) return;
+
+        // Clear existing rows
+        clearHeadersTable();
+        clearBodyTable();
+
+        // Load headers
+        template.headers.forEach(header => {
+            addHeaderRow(header.name, header.value);
+        });
+
+        // Load body parameters
+        template.body.forEach(param => {
+            addBodyRow(param.name, param.value);
+        });
     }
 
     function getHeadersFromTable() {
@@ -4069,24 +4404,67 @@ async function loadTransactionSummary() {
     try {
         showTableLoading('transaction-summary-tbody');
 
-        // Get the selected filter value
+        // Get the selected filter values
         const filterSelect = document.getElementById('transaction-filter');
+        const dateFromInput = document.getElementById('transaction-summary-date-from');
+        const dateToInput = document.getElementById('transaction-summary-date-to');
+        
         const filter = filterSelect ? filterSelect.value : 'all';
+        let dateFrom = dateFromInput ? dateFromInput.value : '';
+        let dateTo = dateToInput ? dateToInput.value : '';
+
+        // Set default to today for dateTo only (dateFrom remains empty for "from any date")
+        const today = new Date().toISOString().split('T')[0];
+        if (!dateTo) dateTo = today;
+
+        // Update input values and filter state
+        if (dateFromInput) dateFromInput.value = dateFrom;
+        if (dateToInput) dateToInput.value = dateTo;
+        
+        transactionSummaryFilters.category = filter;
+        transactionSummaryFilters.dateFrom = dateFrom;
+        transactionSummaryFilters.dateTo = dateTo;
+
+        // Build query parameters
+        let queryParams = `?category=${filter}`;
+        if (dateFrom) queryParams += `&dateFrom=${dateFrom}`;
+        if (dateTo) queryParams += `&dateTo=${dateTo}`;
 
         // Fetch from external API
-        const response = await fetch(`${API_EXTERNAL_URL}/api/mobile/trace/transaction/summary/${filter}`);
+        const response = await fetch(`${API_EXTERNAL_URL}/api/mobile/trace/transaction/summary/${filter}${queryParams}`);
+        
+        // Handle 404 and other error responses
+        if (!response.ok) {
+            if (response.status === 404) {
+                showTableError('transaction-summary-tbody', 'No transaction summary data available');
+            } else {
+                showTableError('transaction-summary-tbody', `Error: ${response.status} ${response.statusText}`);
+            }
+            return;
+        }
+
         const data = await response.json();
 
         if (data.success) {
             renderTransactionSummaryTable(data.data || []);
         } else {
-            showTableError('transaction-summary-tbody', 'Error loading transaction summary');
+            // Handle API returning success: false
+            const errorMsg = data.message || 'Error loading transaction summary';
+            showTableError('transaction-summary-tbody', errorMsg);
         }
 
-        // Setup filter change listener
+        // Setup filter change listeners
         if (filterSelect) {
             filterSelect.removeEventListener('change', loadTransactionSummary);
             filterSelect.addEventListener('change', loadTransactionSummary);
+        }
+        if (dateFromInput) {
+            dateFromInput.removeEventListener('change', loadTransactionSummary);
+            dateFromInput.addEventListener('change', loadTransactionSummary);
+        }
+        if (dateToInput) {
+            dateToInput.removeEventListener('change', loadTransactionSummary);
+            dateToInput.addEventListener('change', loadTransactionSummary);
         }
     } catch (error) {
         console.error('Error loading transaction summary:', error);
@@ -4144,34 +4522,28 @@ function renderTransactionSummaryTable(data) {
             <td>${transaction.ha || '0'}</td>
             <td>${transaction.variety || '-'}</td>
             <td>${transaction.kgs || '0'}</td>
-            <td>₱${transaction.price_kg || '0'}</td>
-            <td><strong>₱${transaction.fresh_harvest || '0'}</strong></td>
-            <td><span class="badge ${badgeColor}">${categoryDisplay}</span></td>
+            <td style="text-align: center;">₱${transaction.price_kg || '0'}</td>
+            <td style="background-color: #1b7a3d; color: white; font-weight: 600; text-align: center;"><strong>₱${transaction.fresh_harvest || '0'}</strong></td>
+            <td style="text-align: center;"><span class="badge ${badgeColor}">${categoryDisplay}</span></td>
+            <td>${transaction.farmers_name || '-'}</td>
+            <td>${transaction.farmers_name || '-'}</td>
         `;
         tbody.appendChild(row);
     });
 }
-
 // Drying Data Functions
 async function loadDryingData(page = 1) {
     try {
         showTableLoading('drying-data-tbody');
-        const baseUrl = getApiUrl('/drying-data');
-        const url = `${baseUrl}?page=${page}&per_page=10`;
+        const url = `${API_EXTERNAL_URL}/api/mobile/trace/drying/get-all/`;
         const response = await fetch(url);
         const data = await response.json();
         
-        // Handle paginated response
-        const dryingData = data.data.data || data.data || [];
-        const paginationInfo = data.data.current_page ? data.data : null;
+        // Handle response from external API
+        const dryingData = data.data || [];
         
         currentData = dryingData;
         renderDryingDataTable(dryingData);
-        
-        // Render pagination if available
-        if (paginationInfo) {
-            renderDryingPagination(paginationInfo);
-        }
         
         // Setup search
         setupDryingDataSearch();
@@ -4232,6 +4604,9 @@ function renderDryingDataTable(data) {
             <td class="action-buttons">
                 <button class="btn btn-sm btn-warning" onclick="editEntity('drying_data', ${item.id})">
                     <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteEntity('drying_data', ${item.id})">
+                    <i class="fas fa-trash"></i>
                 </button>
             </td>
         `;
@@ -4349,6 +4724,7 @@ async function openModal(mode, entityType, id = null) {
     currentEntity = entityType;
 
     const modal = new bootstrap.Modal(document.getElementById('entityModal'));
+    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
     const modalTitle = document.getElementById('modalTitle');
     const modalSubtitle = document.getElementById('modalSubtitle');
     const saveBtnText = document.getElementById('saveBtnText');
@@ -4375,24 +4751,32 @@ async function openModal(mode, entityType, id = null) {
         modalSubtitle.textContent = `Create a new ${entityName.toLowerCase()}`;
     }
 
-    // Show loading state
-    formFields.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-3 text-muted">Loading form data...</p></div>';
-    
-    modal.show();
+    // Show loading modal
+    loadingModal.show();
 
-    // Generate form fields
-    formFields.innerHTML = generateFormFields(entityType);
+    try {
+        // Load form options FIRST
+        console.log('📋 Opening modal for', entityType);
+        await loadFormOptions(entityType);
 
-    // Load form options
-    console.log('📋 Opening modal for', entityType);
-    await loadFormOptions(entityType);
+        // THEN generate form fields with loaded options
+        formFields.innerHTML = generateFormFields(entityType);
 
-    // Setup search fields
-    setupFormSearchListeners();
+        // Setup search fields
+        setupFormSearchListeners();
 
-    // If editing, prefill from currentData without fetching
-    if (isEditing && id) {
-        prefillFormFromCurrentData(entityType, id);
+        // If editing, prefill from currentData without fetching
+        if (isEditing && id) {
+            prefillFormFromCurrentData(entityType, id);
+        }
+
+        // Hide loading modal and show entity modal
+        loadingModal.hide();
+        modal.show();
+    } catch (error) {
+        console.error('Error opening modal:', error);
+        loadingModal.hide();
+        showToast('Error loading form', 'error');
     }
 }
 
@@ -4410,7 +4794,6 @@ function addChip(fieldName, value) {
         ${value}
         <button type="button" class="btn-close btn-close-white ms-1" onclick="removeChip('${fieldName}', '${value}')"></button>
     `;
-    
     chipsDisplay.appendChild(chip);
     updateHiddenInput(fieldName);
 }
@@ -4440,9 +4823,12 @@ async function loadFormOptions(entityType) {
         console.log('✅ Millings loaded:', millingsResponse.data?.length || 0);
         console.log('✅ Dryings loaded:', dryingResponse.data?.length || 0);
         
-        // Debug: Log first actor to see structure
+        // Debug: Log first actor and season to see structure
         if (actorsResponse.data && actorsResponse.data.length > 0) {
             console.log('📊 Sample actor:', actorsResponse.data[0]);
+        }
+        if (seasonsResponse.data && seasonsResponse.data.length > 0) {
+            console.log('📊 Sample season:', seasonsResponse.data[0]);
         }
 
         // Store options globally for form generation
@@ -4460,7 +4846,7 @@ async function loadFormOptions(entityType) {
                 const types = actor.type ? actor.type.split(',').map(t => t.trim().toLowerCase()) : [];
                 return types.includes('validator');
             }).map(actor => ({ value: actor.id, label: actor.name })) || [],
-            seasons: seasonsResponse.data?.map(season => ({ value: season.id, label: season.season_name })) || [],
+            seasons: seasonsResponse.data?.map(season => ({ value: season.id, label: season.season_name || season.crop_year || `Season ${season.id}` })) || [],
             batches: batchesResponse.data?.map(batch => ({ value: batch.id, label: `${batch.batch_id || batch.batch_number || batch.id}` })) || [],
             millings: millingsResponse.data?.map(milling => ({ value: milling.id, label: `Milling ${milling.id}${milling.milling_type ? ` - ${milling.milling_type}` : ''}` })) || [],
             dryings: dryingResponse.data?.map(drying => ({ value: drying.id, label: `Drying ${drying.id}${drying.drying_method ? ` - ${drying.drying_method}` : ''}` })) || []
@@ -4490,16 +4876,102 @@ async function loadEntityData(entityType, id) {
 
 function populateFormFields(entityType, data) {
     const fields = getEntityFields(entityType);
+    console.log('📝 Populating form for', entityType, 'with data:', data);
 
     fields.forEach(field => {
+        // Skip file input fields - they cannot be set programmatically
+        if (field.type === 'file') {
+            return;
+        }
+        
         const input = document.getElementById(field.name);
-        if (!input) return;
+        if (!input) {
+            console.log(`⚠️ Input not found for field: ${field.name}`);
+            return;
+        }
+
+        let value = data[field.name];
+
+        // Handle nested JSON objects for rice batches
+        if (entityType === 'rice_batches') {
+            if (field.name === 'milling_id') {
+                if (data.milling && typeof data.milling === 'object') {
+                    value = data.milling.id;
+                } else {
+                    value = data.milling_id;
+                }
+            } else if (field.name === 'drying_id') {
+                if (data.drying && typeof data.drying === 'object') {
+                    value = data.drying.id;
+                } else {
+                    value = data.drying_id;
+                }
+            } else if (field.name === 'current_holder_id') {
+                if (data.current_holder && typeof data.current_holder === 'object') {
+                    value = data.current_holder.id;
+                } else {
+                    value = data.current_holder_id;
+                }
+            } else if (field.name === 'season_id') {
+                if (data.season && typeof data.season === 'object') {
+                    value = data.season.id;
+                } else {
+                    value = data.season_id;
+                }
+            } else if (field.name === 'validator_id') {
+                // Handle validator as direct number or nested object
+                if (typeof data.validator === 'number') {
+                    value = data.validator;
+                } else if (data.validator && typeof data.validator === 'object') {
+                    value = data.validator.id;
+                } else {
+                    value = data.validator_id;
+                }
+            } else if (field.name === 'farmer_id') {
+                if (data.season && typeof data.season === 'object' && data.season.farmer_id) {
+                    value = data.season.farmer_id;
+                } else {
+                    value = data.farmer_id;
+                }
+            } else if (field.name === 'weight') {
+                // Handle weight field - may come from batch_weight_kg in API response
+                value = data.weight || data.batch_weight_kg;
+            }
+        }
+
+        // Handle nested JSON objects for milled rice
+        if (entityType === 'milled_rice') {
+            if (field.name === 'batch_id') {
+                value = data.batch_id;
+            } else if (field.name === 'user_id') {
+                value = data.user_id;
+            } else if (field.name === 'total_weight_kg') {
+                value = data.total_weight_kg;
+            } else if (field.name === 'machine_type') {
+                value = data.milling_type || data.machine_type;
+            } else if (field.name === 'quality_grade') {
+                value = data.quality || data.quality_grade;
+            } else if (field.name === 'moisture_content') {
+                value = data.moisture || data.moisture_content;
+            } else if (field.name === 'output') {
+                value = data.total_weight_processed_kg || data.output;
+            } else if (field.name === 'actual_price') {
+                value = data.actual_price;
+            } else if (field.name === 'recovery') {
+                value = data.recovery;
+            } else if (field.name === 'comment') {
+                value = data.comment;
+            } else if (field.name === 'geotagging') {
+                value = data.geotagging;
+            }
+        }
+
+        console.log(`✏️ Setting ${field.name} = ${value}`);
 
         if (field.type === 'checkbox') {
-            input.checked = data[field.name] ? true : false;
+            input.checked = value === true || value === 1 || value === 'true';
         } else if (field.type === 'chips' || field.type === 'multiselect') {
             // Handle array fields
-            let value = data[field.name];
             if (typeof value === 'string') {
                 value = value.split(',').map(v => v.trim());
             }
@@ -4510,36 +4982,9 @@ function populateFormFields(entityType, data) {
                 }
             }
         } else {
-            input.value = data[field.name] || '';
+            input.value = value || '';
         }
     });
-}
-
-function collectFormData() {
-    const fields = getEntityFields(currentEntity);
-    const formData = {};
-
-    fields.forEach(field => {
-        const input = document.getElementById(field.name);
-        if (!input) return;
-
-        if (field.type === 'checkbox') {
-            formData[field.name] = input.checked ? 1 : 0;
-        } else if (field.type === 'chips' || field.type === 'multiselect') {
-            const value = input.value;
-            try {
-                formData[field.name] = JSON.parse(value);
-            } catch {
-                formData[field.name] = value ? value.split(',') : [];
-            }
-        } else if (field.type === 'number') {
-            formData[field.name] = input.value ? parseFloat(input.value) : null;
-        } else {
-            formData[field.name] = input.value || null;
-        }
-    });
-
-    return formData;
 }
 
 function renderChips(fieldName, values) {
@@ -4547,7 +4992,7 @@ function renderChips(fieldName, values) {
     if (!container) return;
 
     container.innerHTML = values.map(value => `
-        <span class="badge bg-primary me-2 mb-2">
+        <span class="badge bg-primary me-2 mb-2" data-value="${value}">
             ${value}
             <button type="button" class="btn-close btn-close-white ms-1" onclick="removeChip('${fieldName}', '${value}')"></button>
         </span>

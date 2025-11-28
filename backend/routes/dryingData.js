@@ -1,6 +1,35 @@
 const express = require('express');
 const router = express.Router();
 const database = require('../config/database');
+const externalApi = require('../services/externalApiClient');
+
+function forwardSuccess(res, payload) {
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        return res.json(payload);
+    }
+
+    return res.json({ success: true, data: payload });
+}
+
+function handleExternalApiError(res, error, fallbackMessage) {
+    const status = error.status || error.response?.status || 500;
+    const message = error.message || fallbackMessage;
+    const data = error.data || error.response?.data;
+
+    if (data && typeof data === 'object') {
+        return res.status(status).json({
+            success: false,
+            message: data.message || message,
+            error: data.error || message,   
+            data: data.data || null
+        });
+    }
+
+    return res.status(status).json({
+        success: false,
+        message
+    });
+}
 
 // Mock drying data - blockchain-only system
 const mockDryingData = [
@@ -65,51 +94,28 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// POST /api/drying-data - Create drying data record
+// POST /api/drying-data - Create drying data record (upsert without id)
 router.post('/', async (req, res) => {
     try {
-        const {
-            initial_mc,
-            final_mc,
-            temperature,
-            airflow,
-            humidity,
-            duration,
-            price,
-            initial_weight,
-            final_weight
-        } = req.body;
-
-        // Create new record
-        const newRecord = {
-            id: Math.max(...mockDryingData.map(r => r.id), 0) + 1,
-            initial_mc: initial_mc || null,
-            final_mc: final_mc || null,
-            temperature: temperature || null,
-            airflow: airflow || null,
-            humidity: humidity || null,
-            duration: duration || null,
-            price: price || "0.00",
-            initial_weight: initial_weight || null,
-            final_weight: final_weight || null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
-
-        mockDryingData.push(newRecord);
-
-        res.status(201).json({
-            success: true,
-            data: newRecord,
-            message: 'Drying data record created successfully'
-        });
+        const data = await externalApi.post('/mobile/trace/drying/upsert', req.body);
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error creating drying data record:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to create drying data record',
-            message: error.message
-        });
+        console.error('Proxy error creating drying data record:', error);
+        handleExternalApiError(res, error, 'Failed to create drying data record');
+    }
+});
+
+// POST /api/drying-data/:id - Upsert drying data record (update with id)
+router.post('/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        console.log(`Attempting to upsert drying data with ID ${id}:`, req.body);
+        const data = await externalApi.post(`/mobile/trace/drying/upsert/${id}`, req.body);
+        forwardSuccess(res, data);
+    } catch (error) {
+        console.error(`Proxy error updating drying data record ${id}:`, error.message);
+        console.error('Full error:', error);
+        handleExternalApiError(res, error, 'Failed to update drying data record');
     }
 });
 

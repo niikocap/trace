@@ -1,328 +1,107 @@
 const express = require('express');
 const router = express.Router();
+const externalApi = require('../services/externalApiClient');
 
-// Mock production seasons data - blockchain-only system
-const mockSeasons = [
-    { id: 1, season_name: 'Summer 2025', start_date: '2025-03-01', end_date: '2025-08-31', variety: 'Jasmine', carbon_certified: true },
-    { id: 2, season_name: 'Winter 2025', start_date: '2025-09-01', end_date: '2026-02-28', variety: 'Basmati', carbon_certified: false }
-];
+function forwardSuccess(res, payload) {
+    if (payload && typeof payload === 'object') {
+        return res.json(payload);
+    }
 
-// GET /api/production-seasons - Get all production seasons
+    return res.json({ success: true, data: payload });
+}
+
+function handleExternalApiError(res, error, fallbackMessage) {
+    const status = error.status || error.response?.status || 500;
+    const data = error.data || error.response?.data;
+    const message = data?.message || error.message || fallbackMessage;
+
+    if (data && typeof data === 'object') {
+        return res.status(status).json({
+            success: false,
+            message,
+            error: data.error || message,
+            data: data.data || null
+        });
+    }
+
+    return res.status(status).json({
+        success: false,
+        message
+    });
+}
+
+// GET /api/production-seasons - proxy list retrieval
 router.get('/', async (req, res) => {
     try {
-        res.json({
-            success: true,
-            data: mockSeasons,
-            count: mockSeasons.length
+        const data = await externalApi.get('/mobile/trace/season/get-all', {
+            params: req.query
         });
+
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error fetching production seasons:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch production seasons',
-            message: error.message
-        });
+        console.error('Proxy error fetching production seasons:', error);
+        handleExternalApiError(res, error, 'Failed to fetch production seasons');
     }
 });
 
-// GET /api/production-seasons/:id - Get production season by ID
+// GET /api/production-seasons/:id - proxy single season retrieval
 router.get('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { data: season, error } = await database.supabase
-            .from('production_seasons')
-            .select('*')
-            .eq('id', id)
-            .single();
+    const { id } = req.params;
 
-        if (error) {
-            if (error.code === 'PGRST116') {
-                return res.status(404).json({
-                    success: false,
-                    error: 'Production season not found'
-                });
-            }
-            throw error;
-        }
-        
-        res.json({
-            success: true,
-            data: season
-        });
+    try {
+        const data = await externalApi.get(`/mobile/trace/season/${id}`);
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error fetching production season:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch production season',
-            message: error.message
-        });
+        console.error(`Proxy error fetching production season ${id}:`, error);
+        handleExternalApiError(res, error, 'Failed to fetch production season');
     }
 });
 
-// POST /api/production-seasons - Create production season
+// POST /api/production-seasons - proxy create (upsert without id)
 router.post('/', async (req, res) => {
     try {
-        const {
-            season_name,
-            planting_date,
-            harvesting_date,
-            variety,
-            carbon_certified,
-            fertilizer_used,
-            pesticide_used,
-            farmer_id
-        } = req.body;
-        
-        // Validate required fields
-        if (!season_name || !planting_date || !harvesting_date) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: season_name, planting_date, harvesting_date'
-            });
-        }
-        
-        // Validate date format and logic
-        const plantingDate = new Date(planting_date);
-        const harvestingDate = new Date(harvesting_date);
-        
-        if (isNaN(plantingDate.getTime()) || isNaN(harvestingDate.getTime())) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid date format. Use YYYY-MM-DD format'
-            });
-        }
-        
-        if (plantingDate >= harvestingDate) {
-            return res.status(400).json({
-                success: false,
-                error: 'Planting date must be before harvesting date'
-            });
-        }
-        
-        const { data: newSeason, error: insertError } = await database.supabase
-            .from('production_seasons')
-            .insert({
-                season_name,
-                start_date: planting_date,
-                end_date: harvesting_date,
-                variety: variety || null,
-                carbon_certified: carbon_certified || false,
-                fertilizer_used: Array.isArray(fertilizer_used) ? fertilizer_used.join(',') : fertilizer_used || null,
-                pesticide_used: Array.isArray(pesticide_used) ? pesticide_used.join(',') : pesticide_used || null,
-                farmer_id: farmer_id || null
-            })
-            .select()
-            .single();
-
-        if (insertError) {
-            throw insertError;
-        }
-        
-        res.status(201).json({
-            success: true,
-            data: newSeason,
-            message: 'Production season created successfully'
-        });
-        
+        const data = await externalApi.post('/mobile/trace/season/upsert', req.body);
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error creating production season:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to create production season',
-            message: error.message
-        });
+        console.error('Proxy error creating production season:', error);
+        handleExternalApiError(res, error, 'Failed to create production season');
     }
 });
 
-// PUT /api/production-seasons/:id - Update production season
+// PUT /api/production-seasons/:id - proxy update (upsert with id)
 router.put('/:id', async (req, res) => {
+    const { id } = req.params;
+
     try {
-        const { id } = req.params;
-        const {
-            season_name,
-            start_date,
-            end_date,
-            expected_yield,
-            actual_yield,
-            weather_conditions,
-            notes
-        } = req.body;
-        
-        // Check if season exists
-        const { data: existingSeason, error: checkError } = await database.supabase
-            .from('production_seasons')
-            .select('*')
-            .eq('id', id)
-            .single();
-            
-        if (checkError || !existingSeason) {
-            return res.status(404).json({
-                success: false,
-                error: 'Production season not found'
-            });
-        }
-        
-        // Validate dates if provided
-        if (start_date || end_date) {
-            const startDate = new Date(start_date || existingSeason.start_date);
-            const endDate = new Date(end_date || existingSeason.end_date);
-            
-            if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid date format. Use YYYY-MM-DD format'
-                });
-            }
-            
-            if (startDate >= endDate) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Start date must be before end date'
-                });
-            }
-        }
-        
-        const updateData = {};
-        if (season_name !== undefined) updateData.season_name = season_name;
-        if (start_date !== undefined) updateData.start_date = start_date;
-        if (end_date !== undefined) updateData.end_date = end_date;
-        if (expected_yield !== undefined) updateData.expected_yield = expected_yield;
-        if (actual_yield !== undefined) updateData.actual_yield = actual_yield;
-        if (weather_conditions !== undefined) updateData.weather_conditions = weather_conditions;
-        if (notes !== undefined) updateData.notes = notes;
-
-        const { error: updateError } = await database.supabase
-            .from('production_seasons')
-            .update(updateData)
-            .eq('id', id);
-
-        if (updateError) {
-            throw updateError;
-        }
-        
-        const { data: updatedSeason, error: fetchError } = await database.supabase
-            .from('production_seasons')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-        if (fetchError) {
-            throw fetchError;
-        }
-        
-        res.json({
-            success: true,
-            data: updatedSeason,
-            message: 'Production season updated successfully'
-        });
-        
+        const data = await externalApi.post(`/mobile/trace/season/upsert/${id}`, req.body);
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error updating production season:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update production season',
-            message: error.message
-        });
+        console.error(`Proxy error updating production season ${id}:`, error);
+        handleExternalApiError(res, error, 'Failed to update production season');
     }
 });
 
-// DELETE /api/production-seasons/:id - Delete production season
+// DELETE /api/production-seasons/:id - proxy delete endpoint
 router.delete('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        // Check if season exists
-        const { data: existingSeason, error: checkError } = await database.supabase
-            .from('production_seasons')
-            .select('*')
-            .eq('id', id)
-            .single();
-            
-        if (checkError || !existingSeason) {
-            return res.status(404).json({
-                success: false,
-                error: 'Production season not found'
-            });
-        }
-        
-        // Check for dependencies
-        const { data: riceBatches, error: batchError } = await database.supabase
-            .from('rice_batches')
-            .select('id')
-            .eq('production_season_id', id);
-        
-        if (batchError) {
-            throw batchError;
-        }
-        
-        if (riceBatches && riceBatches.length > 0) {
-            return res.status(400).json({
-                success: false,
-                error: 'Cannot delete production season with existing rice batches'
-            });
-        }
-        
-        const { error: deleteError } = await database.supabase
-            .from('production_seasons')
-            .delete()
-            .eq('id', id);
+    const { id } = req.params;
 
-        if (deleteError) {
-            throw deleteError;
-        }
-        
-        res.json({
-            success: true,
-            message: 'Production season deleted successfully'
-        });
-        
+    try {
+        const data = await externalApi.get(`/mobile/trace/season/delete/${id}`);
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error deleting production season:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete production season',
-            message: error.message
-        });
+        console.error(`Proxy error deleting production season ${id}:`, error);
+        handleExternalApiError(res, error, 'Failed to delete production season');
     }
 });
 
-// GET /api/production-seasons/current - Get current active season
+// GET /api/production-seasons/current/active - proxy active season lookup
 router.get('/current/active', async (req, res) => {
     try {
-        const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-        
-        const { data: currentSeasons, error } = await database.supabase
-            .from('production_seasons')
-            .select('*')
-            .lte('start_date', currentDate)
-            .gte('end_date', currentDate)
-            .order('start_date', { ascending: false })
-            .limit(1);
-            
-        if (error) {
-            throw error;
-        }
-        
-        const currentSeason = currentSeasons && currentSeasons.length > 0 ? currentSeasons[0] : null;
-        
-        if (!currentSeason) {
-            return res.status(404).json({
-                success: false,
-                error: 'No active production season found'
-            });
-        }
-        
-        res.json({
-            success: true,
-            data: currentSeason
-        });
+        const data = await externalApi.get('/mobile/trace/season/get-active');
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error fetching current season:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch current season',
-            message: error.message
-        });
+        console.error('Proxy error fetching active production season:', error);
+        handleExternalApiError(res, error, 'Failed to fetch current season');
     }
 });
 

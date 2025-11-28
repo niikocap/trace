@@ -1,319 +1,133 @@
 const express = require('express');
 const router = express.Router();
+const externalApi = require('../services/externalApiClient');
 
-// Mock chain actors data - blockchain-only system
-const mockActors = [
-    { id: 1, name: 'Farmer John', type: 'farmer', contact_info: '555-0001', location: 'Region A', group: 'Group 1' },
-    { id: 2, name: 'Farmer Maria', type: 'farmer', contact_info: '555-0002', location: 'Region B', group: 'Group 1' },
-    { id: 3, name: 'Miller Bob', type: 'miller', contact_info: '555-0003', location: 'Region C', group: 'Group 2' },
-    { id: 4, name: 'Trader Alice', type: 'trader', contact_info: '555-0004', location: 'Region D', group: 'Group 3' }
-];
+function forwardSuccess(res, payload) {
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        return res.json(payload);
+    }
 
-// GET /api/chain-actors - Get all chain actors
+    return res.json({ success: true, data: payload });
+}
+
+function handleExternalApiError(res, error, fallbackMessage) {
+    const status = error.status || error.response?.status || 500;
+    const message = error.message || fallbackMessage;
+    const data = error.data || error.response?.data;
+
+    if (data && typeof data === 'object') {
+        return res.status(status).json({
+            success: false,
+            message: data.message || message,
+            error: data.error || message,
+            data: data.data || null
+        });
+    }
+
+    return res.status(status).json({
+        success: false,
+        message
+    });
+}
+
+// GET /api/chain-actors - proxy list retrieval
 router.get('/', async (req, res) => {
     try {
-        res.json({
-            success: true,
-            data: mockActors,
-            count: mockActors.length
+        const data = await externalApi.get('/mobile/trace/actor/get-all', {
+            params: req.query
         });
+
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error fetching chain actors:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch chain actors',
-            message: error.message
-        });
+        console.error('Proxy error fetching chain actors:', error);
+        handleExternalApiError(res, error, 'Failed to fetch chain actors');
     }
 });
 
-// GET /api/chain-actors/:id - Get chain actor by ID
-router.get('/:id', async (req, res) => {
+// GET /api/chain-actors/search-users - proxy user search for actor assignment
+router.get('/search-users', async (req, res) => {
+    const { query } = req.query;
+
+    if (!query || query.trim().length < 2) {
+        return res.status(400).json({
+            success: false,
+            message: 'Query parameter "query" with at least 2 characters is required'
+        });
+    }
+
     try {
-        const { id } = req.params;
-        const { data: actor, error } = await database.supabase
-            .from('chain_actors')
-            .select('*')
-            .eq('id', id)
-            .single();
-        
-        if (error || !actor) {
-            return res.status(404).json({
-                success: false,
-                error: 'Chain actor not found'
-            });
-        }
-        
-        res.json({
-            success: true,
-            data: actor
-        });
+        const data = await externalApi.get(`/mobile/get-all-users/${encodeURIComponent(query)}`);
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error fetching chain actor:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch chain actor',
-            message: error.message
-        });
+        console.error(`Proxy error searching users with query "${query}":`, error);
+        handleExternalApiError(res, error, 'Failed to search users');
     }
 });
 
-// POST /api/chain-actors - Create chain actor
+// GET /api/chain-actors/:id - proxy single actor retrieval
+router.get('/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const data = await externalApi.get(`/mobile/trace/actor/${id}`);
+        forwardSuccess(res, data);
+    } catch (error) {
+        console.error(`Proxy error fetching chain actor ${id}:`, error);
+        handleExternalApiError(res, error, 'Failed to fetch chain actor');
+    }
+});
+
+// POST /api/chain-actors - proxy create (upsert) without id
 router.post('/', async (req, res) => {
     try {
-        const { name, type, location, group, farmer_id, assign_tps } = req.body;
-        
-        // Validate required fields
-        if (!name || !type) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: name, type'
-            });
-        }
-        
-        // Validate type enum (can be array or string)
-        const validTypes = ['farmer', 'miller', 'distributor', 'retailer', 'validator'];
-        let typeToStore = type;
-        
-        if (Array.isArray(type)) {
-            // Check if all types in array are valid
-            const invalidTypes = type.filter(t => !validTypes.includes(t));
-            if (invalidTypes.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    error: `Invalid type(s): ${invalidTypes.join(', ')}. Must be one of: farmer, miller, distributor, retailer, validator`
-                });
-            }
-            typeToStore = type.join(',');
-        } else {
-            if (!validTypes.includes(type)) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid type. Must be one of: farmer, miller, distributor, retailer, validator'
-                });
-            }
-        }
-        
-        const { data: newActor, error: insertError } = await database.supabase
-            .from('chain_actors')
-            .insert({
-                name,
-                type: typeToStore,
-                location: location || null,
-                group: group || null,
-                farmer_id: farmer_id || null,
-                assign_tps: assign_tps || null
-            })
-            .select()
-            .single();
-            
-        if (insertError) {
-            throw insertError;
-        }
-        
-        res.status(201).json({
-            success: true,
-            data: newActor,
-            message: 'Chain actor created successfully'
-        });
-        
+        const data = await externalApi.post('/mobile/trace/actor/upsert', req.body);
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error creating chain actor:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to create chain actor',
-            message: error.message
-        });
+        console.error('Proxy error creating chain actor:', error);
+        handleExternalApiError(res, error, 'Failed to create chain actor');
     }
 });
 
-// PUT /api/chain-actors/:id - Update chain actor
+// PUT /api/chain-actors/:id - proxy update (upsert with id)
 router.put('/:id', async (req, res) => {
+    const { id } = req.params;
+
     try {
-        const { id } = req.params;
-        const { name, type, contact_info, location, certification_details } = req.body;
-        
-        // Check if actor exists
-        const { data: existingActor, error: checkError } = await database.supabase
-            .from('chain_actors')
-            .select('*')
-            .eq('id', id)
-            .single();
-            
-        if (checkError || !existingActor) {
-            return res.status(404).json({
-                success: false,
-                error: 'Chain actor not found'
-            });
-        }
-        
-        // Validate type enum if provided
-        let typeToStore = type;
-        if (type) {
-            const validTypes = ['farmer', 'miller', 'distributor', 'retailer', 'validator'];
-            
-            if (Array.isArray(type)) {
-                const invalidTypes = type.filter(t => !validTypes.includes(t));
-                if (invalidTypes.length > 0) {
-                    return res.status(400).json({
-                        success: false,
-                        error: `Invalid type(s): ${invalidTypes.join(', ')}. Must be one of: farmer, miller, distributor, retailer, validator`
-                    });
-                }
-                typeToStore = type.join(',');
-            } else {
-                if (!validTypes.includes(type)) {
-                    return res.status(400).json({
-                        success: false,
-                        error: 'Invalid type. Must be one of: farmer, miller, distributor, retailer, validator'
-                    });
-                }
-            }
-        }
-        
-        const updateData = {};
-        if (name !== undefined) updateData.name = name;
-        if (typeToStore !== undefined) updateData.type = typeToStore;
-        if (location !== undefined) updateData.location = location;
-        if (group !== undefined) updateData.group = group;
-        if (farmer_id !== undefined) updateData.farmer_id = farmer_id;
-        if (assign_tps !== undefined) updateData.assign_tps = assign_tps;
-        
-        const { error: updateError } = await database.supabase
-            .from('chain_actors')
-            .update(updateData)
-            .eq('id', id);
-            
-        if (updateError) {
-            throw updateError;
-        }
-        
-        const { data: updatedActor, error: fetchError } = await database.supabase
-            .from('chain_actors')
-            .select('*')
-            .eq('id', id)
-            .single();
-            
-        if (fetchError) {
-            throw fetchError;
-        }
-        
-        res.json({
-            success: true,
-            data: updatedActor,
-            message: 'Chain actor updated successfully'
-        });
-        
+        const data = await externalApi.post(`/mobile/trace/actor/upsert/${id}`, req.body);
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error updating chain actor:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update chain actor',
-            message: error.message
-        });
+        console.error(`Proxy error updating chain actor ${id}:`, error);
+        handleExternalApiError(res, error, 'Failed to update chain actor');
     }
 });
 
-// DELETE /api/chain-actors/:id - Delete chain actor
+// DELETE /api/chain-actors/:id - proxy delete endpoint
 router.delete('/:id', async (req, res) => {
+    const { id } = req.params;
+
     try {
-        const { id } = req.params;
-        
-        // Check if actor exists
-        const { data: existingActor, error: checkError } = await database.supabase
-            .from('chain_actors')
-            .select('*')
-            .eq('id', id)
-            .single();
-            
-        if (checkError || !existingActor) {
-            return res.status(404).json({
-                success: false,
-                error: 'Chain actor not found'
-            });
-        }
-        
-        // Check for dependencies
-        const { data: riceBatches, error: batchError } = await database.supabase
-            .from('rice_batches')
-            .select('id')
-            .eq('farmer_id', id);
-            
-        const { data: milledRice, error: milledError } = await database.supabase
-            .from('milled_rice')
-            .select('id')
-            .eq('miller_id', id);
-            
-        if (batchError || milledError) {
-            throw batchError || milledError;
-        }
-        
-        if ((riceBatches && riceBatches.length > 0) || (milledRice && milledRice.length > 0)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Cannot delete chain actor with existing dependencies (rice batches or milled rice records)'
-            });
-        }
-        
-        const { error: deleteError } = await database.supabase
-            .from('chain_actors')
-            .delete()
-            .eq('id', id);
-            
-        if (deleteError) {
-            throw deleteError;
-        }
-        
-        res.json({
-            success: true,
-            message: 'Chain actor deleted successfully'
-        });
-        
+        // External API currently expects a GET request for deletion
+        const data = await externalApi.get(`/mobile/trace/actor/delete/${id}`);
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error deleting chain actor:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete chain actor',
-            message: error.message
-        });
+        console.error(`Proxy error deleting chain actor ${id}:`, error);
+        handleExternalApiError(res, error, 'Failed to delete chain actor');
     }
 });
 
-// GET /api/chain-actors/type/:type - Get chain actors by type
+// GET /api/chain-actors/type/:type - proxy filtered list by type
 router.get('/type/:type', async (req, res) => {
+    const { type } = req.params;
+
     try {
-        const { type } = req.params;
-        
-        const validTypes = ['farmer', 'miller', 'distributor', 'retailer'];
-        if (!validTypes.includes(type)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid type. Must be one of: farmer, miller, distributor, retailer'
-            });
-        }
-        
-        const { data: actors, error } = await database.supabase
-            .from('chain_actors')
-            .select('*')
-            .eq('type', type)
-            .order('created_at', { ascending: false });
-            
-        if (error) {
-            throw error;
-        }
-        
-        res.json({
-            success: true,
-            data: actors,
-            count: actors.length
+        const data = await externalApi.get('/mobile/trace/actor/get-all', {
+            params: { ...req.query, type }
         });
+
+        forwardSuccess(res, data);
     } catch (error) {
-        console.error('Error fetching chain actors by type:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch chain actors by type',
-            message: error.message
-        });
+        console.error(`Proxy error fetching chain actors by type ${type}:`, error);
+        handleExternalApiError(res, error, 'Failed to fetch chain actors by type');
     }
 });
 

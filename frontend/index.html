@@ -321,13 +321,14 @@
                             <thead class="table-dark">
                                 <tr>
                                     <th>ID</th>
-                                    <th>QR Code</th>
                                     <th>Weight</th>
-                                    <th>Moisture</th>
-                                    <th>Variety</th>
+                                    <th>Harvest Date</th>
+                                    <th>Season</th>
                                     <th>Current Holder</th>
-                                    <th>Price/kg</th>
-                                    <th>Status</th>
+                                    <th>Milling</th>
+                                    <th>Drying</th>
+                                    <th>Validator</th>
+                                    <th>Quality</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -397,6 +398,10 @@
                         <button class="btn btn-sm btn-outline-secondary" id="filter-toggle-btn-header" type="button"
                             title="Toggle Filters">
                             <i class="fas fa-filter"></i>
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="openTransactionModal()" type="button"
+                            title="Add New Transaction">
+                            <i class="fas fa-plus me-1"></i> New Transaction
                         </button>
                         <button class="btn btn-sm btn-outline-primary" onclick="loadChainTransactions()" type="button"
                             title="Refresh Transactions">
@@ -586,8 +591,16 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5><i class="fas fa-file-invoice me-2"></i>Transaction Summary</h5>
-                    <div>
-                        <select class="form-select d-inline-block" id="transaction-filter" style="width: 200px;">
+                    <div class="d-flex gap-2 align-items-center">
+                        <div>
+                            <label class="form-label small mb-0 me-2">Date From:</label>
+                            <input type="date" class="form-control form-control-sm d-inline-block" id="transaction-summary-date-from" style="width: 150px;" value="">
+                        </div>
+                        <div>
+                            <label class="form-label small mb-0 me-2">Date To:</label>
+                            <input type="date" class="form-control form-control-sm d-inline-block" id="transaction-summary-date-to" style="width: 150px;" value="">
+                        </div>
+                        <select class="form-select form-select-sm d-inline-block" id="transaction-filter" style="width: 150px;">
                             <option value="all" selected>All</option>
                             <option value="blo">BLO</option>
                             <option value="coop">COOP</option>
@@ -608,7 +621,7 @@
                                     <th>Variety</th>
                                     <th>KGS</th>
                                     <th>Price/KG</th>
-                                    <th>Fresh Harvest</th>
+                                    <th style="background-color: #1b7a3d; color: white; font-weight: 600; text-align: center;">Fresh Harvest</th>
                                     <th>Category</th>
                                 </tr>
                             </thead>
@@ -627,8 +640,16 @@
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5><i class="fas fa-file-invoice me-2"></i>Transaction Summary</h5>
-                    <div>
-                        <select class="form-select d-inline-block" id="transaction-filter" style="width: 200px;">
+                    <div class="d-flex gap-2 align-items-center">
+                        <div>
+                            <label class="form-label small mb-0 me-2">Date From:</label>
+                            <input type="date" class="form-control form-control-sm d-inline-block" id="transaction-summary-date-from" style="width: 150px;" value="">
+                        </div>
+                        <div>
+                            <label class="form-label small mb-0 me-2">Date To:</label>
+                            <input type="date" class="form-control form-control-sm d-inline-block" id="transaction-summary-date-to" style="width: 150px;" value="">
+                        </div>
+                        <select class="form-select form-select-sm d-inline-block" id="transaction-filter" style="width: 150px;">
                             <option value="all" selected>All</option>
                             <option value="blo">BLO</option>
                             <option value="coop">COOP</option>
@@ -890,12 +911,28 @@
         </div>
     </div>
 
+    <!-- Loading Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 100px;">
+            <div class="modal-content rounded-5" style="background: rgba(25, 135, 84, 0.1); border: 2px solid #198754; box-shadow: 0 0 20px rgba(25, 135, 84, 0.3);">
+                <div class="modal-body text-center p-3">
+                    <div class="spinner-border text-success" role="status" style="width: 2.5rem; height: 2.5rem; border-width: 0.25em;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Generic Entity Add/Edit Modal -->
     <div class="modal fade" id="entityModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
+            <div class="modal-content rounded-4">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="modalTitle">Add New Item</h5>
+                    <div>
+                        <h5 class="modal-title" id="modalTitle">Add New Item</h5>
+                        <small class="text-muted" id="modalSubtitle"></small>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -908,7 +945,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="saveEntityBtn" onclick="saveEntity()">
-                        <i class="fas fa-save me-2"></i>Save
+                        <i class="fas fa-save me-2"></i><span id="saveBtnText">Save</span>
                     </button>
                 </div>
             </div>
@@ -954,6 +991,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.7.7/dist/axios.min.js"></script>
     <script src="js/app.js"></script>
 </body>
 

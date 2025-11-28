@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const database = require('../config/database');
+const { v4: uuidv4 } = require('uuid');
 
 // Mock rice batches data - blockchain-only system
 const mockBatches = [
@@ -70,163 +72,20 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// POST /api/rice-batches - Create rice batch
+// POST /api/rice-batches - Create rice batch (upsert without id)
 router.post('/', async (req, res) => {
     try {
-        const {
-            batch_number,
-            farmer_id,
-            production_season_id,
-            rice_variety,
-            milling_id,
-            validator_id,
-            dryer,
-            planting_date,
-            harvest_date,
-            quantity_harvested,
-            quality_grade,
-            farming_practices,
-            certifications,
-            storage_conditions
-        } = req.body;
-        
-        // Generate auto UUID for batch_id and QR code
-        const batch_id = uuidv4();
-        const qr_code = batch_id; // Use UUID as QR code identifier
-        
-        // Auto-generate batch_number if not provided
-        const finalBatchNumber = batch_number || `BATCH-${Date.now()}`;
-        
-        // Validate required fields
-        if (!farmer_id || !production_season_id || !rice_variety) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: farmer_id, production_season_id, rice_variety'
-            });
-        }
-        
-        // Check for unique batch number
-        const { data: existingBatch } = await database.supabase
-            .from('rice_batches')
-            .select('id')
-            .eq('batch_number', finalBatchNumber)
-            .single();
-            
-        if (existingBatch) {
-            return res.status(400).json({
-                success: false,
-                error: 'Batch number already exists'
-            });
-        }
-        
-        // Validate foreign key constraints
-        const { data: farmer } = await database.supabase
-            .from('chain_actors')
-            .select('id')
-            .eq('id', farmer_id)
-            .eq('type', 'farmer')
-            .single();
-            
-        if (!farmer) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid farmer_id: farmer not found or not of type "farmer"'
-            });
-        }
-        
-        const { data: season } = await database.supabase
-            .from('production_seasons')
-            .select('id')
-            .eq('id', production_season_id)
-            .single();
-            
-        if (!season) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid production_season_id: production season not found'
-            });
-        }
-        
-        // Validate dates if provided
-        if (planting_date) {
-            const plantingDate = new Date(planting_date);
-            if (isNaN(plantingDate.getTime())) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid planting_date format. Use YYYY-MM-DD format'
-                });
-            }
-        }
-        
-        if (harvest_date) {
-            const harvestDate = new Date(harvest_date);
-            if (isNaN(harvestDate.getTime())) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid harvest_date format. Use YYYY-MM-DD format'
-                });
-            }
-            
-            // Check if harvest date is after planting date
-            if (planting_date && new Date(planting_date) >= new Date(harvest_date)) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Harvest date must be after planting date'
-                });
-            }
-        }
-        
-        // Validate quantity if provided
-        if (quantity_harvested !== undefined) {
-            const quantity = parseFloat(quantity_harvested);
-            if (isNaN(quantity) || quantity < 0) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'quantity_harvested must be a non-negative number'
-                });
-            }
-        }
-        
-        const { data: newRiceBatch, error: insertError } = await database.supabase
-            .from('rice_batches')
-            .insert({
-                batch_id,
-                batch_number: finalBatchNumber,
-                farmer_id,
-                production_season_id,
-                rice_variety,
-                milling_id: milling_id || null,
-                validator_id: validator_id || null,
-                dryer: dryer || null,
-                planting_date: planting_date || null,
-                harvest_date: harvest_date || null,
-                quantity_harvested: quantity_harvested || null,
-                quality_grade: quality_grade || null,
-                farming_practices: farming_practices || null,
-                certifications: certifications || null,
-                storage_conditions: storage_conditions || null
-            })
-            .select(`
-                *,
-                farmer:chain_actors!farmer_id(name),
-                production_season:production_seasons!production_season_id(season_name)
-            `)
-            .single();
+        const externalApi = require('../services/externalApiClient');
+        const payload = req.body;
 
-        if (insertError) {
-            throw insertError;
-        }
+        console.log('Creating rice batch:', payload);
 
-        // Transform the data to match expected format
-        const transformedData = {
-            ...newRiceBatch,
-            farmer_name: newRiceBatch.farmer?.name || null,
-            season_name: newRiceBatch.production_season?.season_name || null
-        };
+        // Forward to external API
+        const data = await externalApi.post('/mobile/trace/batch/upsert', payload);
         
         res.status(201).json({
             success: true,
-            data: transformedData,
+            data: data,
             message: 'Rice batch created successfully'
         });
         
@@ -235,6 +94,34 @@ router.post('/', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to create rice batch',
+            message: error.message
+        });
+    }
+});
+
+// POST /api/rice-batches/:id - Upsert rice batch (update with id)
+router.post('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const externalApi = require('../services/externalApiClient');
+        const payload = req.body;
+
+        console.log(`Upserting rice batch with ID ${id}:`, payload);
+
+        // Forward to external API
+        const data = await externalApi.post(`/mobile/trace/batch/upsert/${id}`, payload);
+        
+        res.json({
+            success: true,
+            data: data,
+            message: 'Rice batch updated successfully'
+        });
+        
+    } catch (error) {
+        console.error(`Error upserting rice batch ${req.params.id}:`, error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update rice batch',
             message: error.message
         });
     }
@@ -558,6 +445,61 @@ router.get('/season/:seasonId', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch rice batches by season',
+            message: error.message
+        });
+    }
+});
+
+// POST /api/batch/upsert or /api/batch/upsert/:id - Upsert batch to external API
+router.post('/upsert/:id?', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const payload = req.body;
+
+        // Log the incoming request
+        console.log('Upsert batch request:', { id, payload });
+
+        // Get external API configuration
+        const externalApi = require('../config/externalApi');
+        const axios = require('axios');
+
+        // Build the external API endpoint
+        const externalEndpoint = id 
+            ? `${externalApi.baseUrl}/mobile/trace/batch/upsert/${id}`
+            : `${externalApi.baseUrl}/mobile/trace/batch/upsert`;
+
+        console.log('Calling external API:', externalEndpoint);
+
+        // Call the external API
+        const response = await axios.post(externalEndpoint, payload, {
+            timeout: externalApi.timeout,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // Return the external API response
+        res.json({
+            success: true,
+            data: response.data,
+            message: id ? 'Batch updated successfully' : 'Batch created successfully'
+        });
+
+    } catch (error) {
+        console.error('Error upserting batch:', error.message);
+        
+        // Handle external API errors
+        if (error.response) {
+            return res.status(error.response.status).json({
+                success: false,
+                error: 'External API error',
+                message: error.response.data?.message || error.message
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            error: 'Failed to upsert batch',
             message: error.message
         });
     }

@@ -84,6 +84,7 @@ app.use('/api/chain-actors', chainActorRoutes);
 app.use('/api/production-seasons', productionSeasonRoutes);
 app.use('/api/milled-rice', milledRiceRoutes);
 app.use('/api/rice-batches', riceBatchRoutes);
+app.use('/api/batch', riceBatchRoutes);
 app.use('/api/drying-data', dryingDataRoutes);
 
 // Health check endpoint
