@@ -2360,8 +2360,8 @@ async function performSearchFieldSearch(query, dropdownId, inputId, fieldType) {
     try {
         // For farmer and validator fields, use external API
         if (fieldType === 'farmer' || fieldType === 'validator') {
-            const externalApiUrl = 'https://ds.capiroso.site/api';
-            const response = await fetch(`${externalApiUrl}/mobile/get-all-users?search=${encodeURIComponent(query)}`);
+            const externalApiUrl = API_EXTERNAL_URL;
+            const response = await fetch(`${externalApiUrl}/api/mobile/get-all-users/${encodeURIComponent(query)}`);
             const data = await response.json();
             
             if (data.data && Array.isArray(data.data)) {
@@ -2825,7 +2825,7 @@ function getEntityFields(entityType) {
         ],
         'production_seasons': [
             { name: 'crop_year', label: 'Crop Year', type: 'text', required: true, placeholder: 'e.g., 2025-2026' },
-            { name: 'farmer_id', label: 'Farmer', type: 'search', required: true },
+            { name: 'farmer_id', label: 'Farmer', type: 'select', required: true, options: transactionFormOptions.actors },
             { name: 'variety', label: 'Variety', type: 'text', required: true, placeholder: 'e.g., NK8840VIP - GMCn92' },
             { 
                 name: 'season', label: 'Season', type: 'select', required: true,
@@ -2864,12 +2864,11 @@ function getEntityFields(entityType) {
             }
         ],
         'rice_batches': [
-            { name: 'farmer_id', label: 'Farmer', type: 'search', required: true },
+            { name: 'farmer_id', label: 'Farmer', type: 'select', required: true, options: transactionFormOptions.actors },
             { name: 'season_id', label: 'Production Season', type: 'select', required: true, options: transactionFormOptions.seasons },
-            { name: 'weight', label: 'Weight (kg)', type: 'number', required: true, step: '0.01', placeholder: 'e.g., 15' },
             { name: 'moisture_content', label: 'Moisture Content (%)', type: 'number', required: true, step: '0.01', placeholder: 'e.g., 14' },
             { name: 'price_per_kg', label: 'Price per kg (₱)', type: 'number', required: true, step: '0.01', placeholder: 'e.g., 50' },
-            { name: 'batch_weight_kg', label: 'Batch Weight (kg)', type: 'number', required: false, step: '0.01' },
+            { name: 'weight', label: 'Weight (kg)', type: 'number', required: false, step: '0.01' },
             { name: 'current_holder_id', label: 'Current Holder', type: 'select', required: false, options: transactionFormOptions.actors },
             { name: 'milling_id', label: 'Milling', type: 'select', required: false, options: transactionFormOptions.millings },
             { name: 'drying_id', label: 'Drying', type: 'select', required: false, options: transactionFormOptions.dryings },
