@@ -114,8 +114,9 @@ ehthumbs.db
 Thumbs.db
 
 # Solana/Anchor specific
-target/
+
 !target/idl/
+target/
 test-ledger/
 .anchor/
 keypairs/

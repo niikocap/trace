@@ -7,7 +7,7 @@ const path = require('path');
 // Solana configuration
 const SOLANA_CONFIG = {
     network: process.env.SOLANA_NETWORK || 'devnet',
-    programId: process.env.PROGRAM_ID || 'AvgeUvuXvYdhsbL2AF3c818y3UfTXcjwceXRr6tA4ba1',
+    programId: process.env.PROGRAM_ID || 'GFAsGatYbWtANDewLz4VMJtZhfaWUYeXwR9xxd5XyMPE',
     commitment: 'confirmed'
 };
 
