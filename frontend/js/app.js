@@ -4,7 +4,7 @@
 // Dynamic API base URL that works for both local development and deployed environments
 const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api`;
   const API_EXTERNAL_URL = "https://digisaka.app";
-  // const API_EXTERNAL_URL = "https://ds.capiroso.site";
+  // const API_EXTERNAL_URL = "https://digisaka.app";
 
 // Global variables
 let currentSection = 'dashboard';
@@ -574,13 +574,11 @@ async function loadProductionSeasons(page = 1) {
 async function loadRiceBatches(page = 1) {
     try {
         showTableLoading('batches-tbody');
-        const url = `${API_BASE_URL}/rice-batches?page=${page}&per_page=10`;
-        const response = await fetch(url);
-        const data = await response.json();
+        const batchesResponse = await fetchData('/rice-batches');
         
         // Handle paginated response
-        const batchesData = data.data.data || data.data || [];
-        const paginationInfo = data.data.current_page ? data.data : null;
+        const batchesData = batchesResponse.data.data || batchesResponse.data || [];
+        const paginationInfo = batchesResponse.data.current_page ? batchesResponse.data : null;
         
         // Fetch related data
         const [chainActorsRes, milledRiceRes] = await Promise.all([
@@ -588,8 +586,8 @@ async function loadRiceBatches(page = 1) {
             fetch(`${API_BASE_URL}/milled-rice`)
         ]);
         
-        const chainActorsData = await chainActorsRes.json();
-        const milledRiceData = await milledRiceRes.json();
+        const chainActorsData = chainActorsRes;
+        const milledRiceData = milledRiceRes;
         const usersData = { data: [] }; // No users endpoint yet
         
         // Create lookup maps
@@ -2479,6 +2477,47 @@ function setupFormSearchListeners() {
     }
 }
 
+// Setup transaction-specific form listeners
+function setupTransactionFormListeners() {
+    const fromActorSelect = document.getElementById('from_actor_id');
+    const deductionField = document.getElementById('deduction');
+    
+    if (!fromActorSelect || !deductionField) return;
+    
+    // Function to check if actor is buyback and show/hide deduction field
+    function updateDeductionVisibility() {
+        const selectedActorId = fromActorSelect.value;
+        if (!selectedActorId) {
+            deductionField.parentElement.parentElement.style.display = 'none';
+            return;
+        }
+        
+        // Find the selected actor in transactionFormOptions
+        const selectedActor = transactionFormOptions.actors.find(actor => actor.value == selectedActorId);
+        
+        if (selectedActor) {
+            // Fetch the full actor data to check if it's a buyback group
+            const actorData = currentData.find(item => item.id == selectedActorId);
+            
+            if (actorData && actorData.group && actorData.group.toLowerCase() === 'buyback') {
+                // Show deduction field for buyback actors
+                deductionField.parentElement.parentElement.style.display = 'block';
+            } else {
+                // Hide deduction field for non-buyback actors
+                deductionField.parentElement.parentElement.style.display = 'none';
+                // Reset to default value
+                deductionField.value = '0';
+            }
+        }
+    }
+    
+    // Listen for changes to from_actor_id
+    fromActorSelect.addEventListener('change', updateDeductionVisibility);
+    
+    // Initial check on form load
+    updateDeductionVisibility();
+}
+
 async function saveChainActor() {
     try {
         // Validate required fields
@@ -2678,8 +2717,9 @@ function generateFormFields(entityType) {
         html += '<div class="row g-2 mb-1">';
 
         // First field
+        const field1Display = field1.visible === false ? 'display: none;' : '';
         html += `
-            <div class="col-md-${field2 ? '6' : '12'}">
+            <div class="col-md-${field2 ? '6' : '12'}" style="${field1Display}">
                 <div class="form-group">
                     ${field1.type !== 'checkbox' ? `<label for="${field1.name}" class="form-label fw-semibold text-dark mb-1 d-block">${field1.label}${field1.required ? '<span class="text-danger ms-1">*</span>' : ''}</label>` : ''}
                     <div class="form-input-wrapper">
@@ -2691,8 +2731,9 @@ function generateFormFields(entityType) {
 
         // Second field if exists
         if (field2) {
+            const field2Display = field2.visible === false ? 'display: none;' : '';
             html += `
-                <div class="col-md-6">
+                <div class="col-md-6" style="${field2Display}">
                     <div class="form-group">
                         ${field2.type !== 'checkbox' ? `<label for="${field2.name}" class="form-label fw-semibold text-dark mb-1 d-block">${field2.label}${field2.required ? '<span class="text-danger ms-1">*</span>' : ''}</label>` : ''}
                         <div class="form-input-wrapper">
@@ -2734,8 +2775,14 @@ function generateFieldInput(field) {
                     </div>`;
         case 'select':
             let options = '';
-            if (field.options && Array.isArray(field.options)) {
-                field.options.forEach(option => {
+            // For dynamic options (like batch_id in transactions), get fresh options from transactionFormOptions
+            let fieldOptions = field.options;
+            if (field.name === 'batch_id' && currentEntity === 'chain_transactions') {
+                fieldOptions = transactionFormOptions.batches;
+                console.log('🔍 Rendering batch_id field. Available batches:', fieldOptions);
+            }
+            if (fieldOptions && Array.isArray(fieldOptions)) {
+                fieldOptions.forEach(option => {
                     const selected = field.defaultValue === option.value ? 'selected' : '';
                     options += `<option value="${option.value}" ${selected}>${option.label}</option>`;
                 });
@@ -2930,6 +2977,7 @@ function getEntityFields(entityType) {
                 ]
             },
             { name: 'moisture', label: 'Moisture Content (%)', type: 'text', required: false, placeholder: 'e.g., 14.5%' },
+            { name: 'deduction', label: 'Deduction (₱)', type: 'number', required: false, step: '0.01', placeholder: 'e.g., 0', visible: false, defaultValue: '0' },
             {
                 name: 'status', label: 'Status', type: 'select', required: true, defaultValue: 'completed',
                 options: [
@@ -2937,7 +2985,10 @@ function getEntityFields(entityType) {
                     { value: 'completed', label: 'Completed' },
                     { value: 'cancelled', label: 'Cancelled' }
                 ]
-            }
+            },
+            { name: 'agree_seller', label: '', type: 'hidden', required: false, defaultValue: '1' },
+            { name: 'agree_buyer', label: '', type: 'hidden', required: false, defaultValue: '1' },
+            { name: 'is_test', label: '', type: 'hidden', required: false, defaultValue: '1' }
         ],
         'drying_data': [
             { name: 'initial_mc', label: 'Initial Moisture Content (%)', type: 'number', required: false, step: '0.01', placeholder: 'e.g., 20.00' },
@@ -3084,9 +3135,15 @@ function collectFormData() {
                 } else if (field.name === 'payment_reference' && value) {
                     // Convert to integer
                     data[field.name] = parseInt(value);
+                } else if (field.name === 'deduction') {
+                    // Always include deduction, default to 0
+                    data[field.name] = value ? parseFloat(value) : 0;
                 } else if (field.name === 'transaction_date') {
                     // Use today's date
                     data[field.name] = new Date().toISOString().split('T')[0];
+                } else if (field.type === 'hidden') {
+                    // Always include hidden fields
+                    data[field.name] = value || field.defaultValue || '1';
                 } else if (value !== null) {
                     data[field.name] = value;
                 }
@@ -3170,13 +3227,13 @@ async function deleteEntity(entityType, id) {
     }
 
     try {
-        // Map entity types to delete endpoints
+        // Map entity types to external trace API delete endpoints
         const deleteEndpoints = {
-            'chain_actors': '/chain-actors',
-            'production_seasons': '/production-seasons',
-            'rice_batches': '/rice-batches',
-            'milled_rice': '/milled-rice',
-            'drying_data': '/drying-data'
+            'chain_actors': '/api/mobile/trace/actor/delete',
+            'production_seasons': '/api/mobile/trace/season/delete',
+            'rice_batches': '/api/mobile/trace/batch/delete',
+            'milled_rice': '/api/mobile/trace/milling/delete',
+            'drying_data': '/api/mobile/trace/drying/delete'
         };
 
         const deleteEndpoint = deleteEndpoints[entityType];
@@ -3185,8 +3242,8 @@ async function deleteEntity(entityType, id) {
             return;
         }
 
-        const response = await fetch(`${API_BASE_URL}${deleteEndpoint}/${id}`, {
-            method: 'DELETE'
+        const response = await fetch(`${API_EXTERNAL_URL}${deleteEndpoint}/${id}`, {
+            method: 'GET'
         });
         const data = await response.json();
 
@@ -3233,6 +3290,7 @@ function getApiUrl(endpoint) {
     }
     // Map endpoints to external API paths
     const externalEndpoints = {
+        '/chain-actors': '/api/mobile/trace/actor/get-all',
         '/rice-batches': '/api/mobile/trace/batch/get-all',
         '/milled-rice': '/api/mobile/trace/milling/get-all',
         '/production-seasons': '/api/mobile/trace/season/get-all',
@@ -4524,8 +4582,6 @@ function renderTransactionSummaryTable(data) {
             <td style="text-align: center;">₱${transaction.price_kg || '0'}</td>
             <td style="background-color: #1b7a3d; color: white; font-weight: 600; text-align: center;"><strong>₱${transaction.fresh_harvest || '0'}</strong></td>
             <td style="text-align: center;"><span class="badge ${badgeColor}">${categoryDisplay}</span></td>
-            <td>${transaction.farmers_name || '-'}</td>
-            <td>${transaction.farmers_name || '-'}</td>
         `;
         tbody.appendChild(row);
     });
@@ -4763,6 +4819,11 @@ async function openModal(mode, entityType, id = null) {
 
         // Setup search fields
         setupFormSearchListeners();
+
+        // Setup transaction-specific listeners
+        if (entityType === 'chain_transactions') {
+            setupTransactionFormListeners();
+        }
 
         // If editing, prefill from currentData without fetching
         if (isEditing && id) {

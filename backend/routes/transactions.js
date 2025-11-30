@@ -208,7 +208,7 @@ router.post('/', async (req, res) => {
             transaction_date: new Date().toISOString(),
             status: statusValue,
             moisture: parseInt(moisture || '0'),
-            is_test: is_test !== undefined ? Number(is_test) : 1,
+            is_test: 1 ,// is_test !== undefined ? Number(is_test) : (req.hostname === 'localhost' || req.hostname === '127.0.0.1' ? 1 : 0),
             nonce: nonce !== undefined ? nonce : 0
         };
         
@@ -326,7 +326,7 @@ router.post('/:id', async (req, res) => {
             transaction_date: new Date().toISOString(),
             status: statusValue,
             moisture: parseInt(moisture || '0'),
-            is_test: is_test !== undefined ? Number(is_test) : 1,
+            is_test: 1,// is_test !== undefined ? Number(is_test) : (req.hostname === 'localhost' || req.hostname === '127.0.0.1' ? 1 : 0),
             nonce: nonce !== undefined ? nonce : 0
         };
         
@@ -443,7 +443,7 @@ function transformTransactionPayload(payload) {
         quality: payload.quality || null,
         payment_reference: payload.payment_reference ? parseInt(payload.payment_reference) : null,
         payment_method: payload.payment_method || null,
-        deduction: payload.deduction || null,
+        deduction: payload.deduction !== undefined && payload.deduction !== null ? parseFloat(payload.deduction) : 0,
         status: payload.status || null,
         agree_seller: payload.agree_seller || null,
         agree_buyer: payload.agree_buyer || null,
