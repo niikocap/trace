@@ -581,13 +581,10 @@ async function loadRiceBatches(page = 1) {
         const paginationInfo = batchesResponse.data.current_page ? batchesResponse.data : null;
         
         // Fetch related data
-        const [chainActorsRes, milledRiceRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/chain-actors`),
-            fetch(`${API_BASE_URL}/milled-rice`)
+        const [chainActorsData, milledRiceData] = await Promise.all([
+            fetch(`${API_BASE_URL}/chain-actors`).then(r => r.json()),
+            fetch(`${API_BASE_URL}/milled-rice`).then(r => r.json())
         ]);
-        
-        const chainActorsData = chainActorsRes;
-        const milledRiceData = milledRiceRes;
         const usersData = { data: [] }; // No users endpoint yet
         
         // Create lookup maps
@@ -1082,29 +1079,36 @@ function renderRiceBatchesTable(data, chainActorsMap = {}, milledRiceMap = {}, u
 
     data.forEach(batch => {
         const row = document.createElement('tr');
-        const seasonName = batch.season_name || '-';
-        const currentHolder = chainActorsMap[batch.farmer_id] || batch.farmer_name || '-';
         
-        // Get milling data for this batch
-        const milledData = milledRiceMap[batch.id];
-        const millingName = milledData ? (chainActorsMap[milledData.miller_id] || milledData.miller_name || '-') : '-';
+        // Extract season info from nested season object
+        const seasonName = batch.season?.season || batch.season?.crop_year || '-';
+        const harvestDate = batch.season?.harvest_date || batch.harvest_date || '-';
         
-        // Get drying data (from milled rice if available)
-        const dryingName = milledData ? (milledData.dryer_name || '-') : '-';
+        // Extract current holder info from nested current_holder object
+        const currentHolderName = batch.current_holder?.name || '-';
+        
+        // Get milling data - check if milling object exists
+        const millingName = batch.milling?.miller_name || '-';
+        
+        // Get drying data from milling object if available
+        const dryingName = batch.milling?.dryer_name || '-';
         
         // Get validator name
-        const validatorName = usersMap[batch.validator_id] || '-';
+        const validatorName = batch.validator || usersMap[batch.validator_id] || '-';
+        
+        // Get weight - use batch_weight_kg
+        const weight = batch.batch_weight_kg || '-';
         
         row.innerHTML = `
             <td>${batch.id}</td>
-            <td>${batch.quantity_kg || '-'} kg</td>
-            <td>${batch.harvest_date ? new Date(batch.harvest_date).toLocaleDateString() : '-'}</td>
+            <td>${weight} kg</td>
+            <td>${harvestDate !== '-' ? new Date(harvestDate).toLocaleDateString() : '-'}</td>
             <td>${seasonName}</td>
-            <td>${currentHolder}</td>
+            <td>${currentHolderName}</td>
             <td>${millingName}</td>
             <td>${dryingName}</td>
             <td>${validatorName}</td>
-            <td>${batch.quality_score || '-'}</td>
+            <td>${batch.status || '-'}</td>
             <td class="action-buttons">
                 <button class="btn btn-sm btn-warning" onclick="editEntity('rice_batches', ${batch.id})">
                     <i class="fas fa-edit"></i>
