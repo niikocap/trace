@@ -161,7 +161,14 @@ class SolanaService {
         return { pda, bump };
     }
     
-    async createRealTransaction(transactionData) {
+    // Generate random nonce (0-255)
+    generateRandomNonce() {
+        return Math.floor(Math.random() * 1000) +  Math.floor(Math.random() * 1000);
+    }
+
+    async createRealTransaction(transactionData, retryCount = 0) {
+        const MAX_RETRIES = 3;
+        
         try {
             // Load wallet keypair from environment variable or local file
             let walletKeypair;
@@ -206,15 +213,12 @@ class SolanaService {
             }
             console.log('[TX] Wallet loaded successfully:', walletKeypair.publicKey.toString());
 
-            // Get nonce from transaction data, or use auto-incrementing nonce
+            // Get nonce - randomize instead of sequential
             let nonce = transactionData.nonce;
             if (nonce === undefined || nonce === null) {
-                nonce = this.currentNonce;
-                console.log(`[TX] Auto-assigned nonce: ${nonce}`);
-                // Increment and persist IMMEDIATELY before using
-                this.currentNonce++;
-                this.saveNonce(this.currentNonce);
-                console.log(`[TX] Next nonce will be: ${this.currentNonce}`);
+                // Use random nonce (0-255) instead of sequential
+                nonce = this.generateRandomNonce();
+                console.log(`[TX] Generated random nonce: ${nonce} (retry: ${retryCount}/${MAX_RETRIES})`);
             } else {
                 console.log(`[TX] Using provided nonce: ${nonce}`);
             }
@@ -316,6 +320,18 @@ class SolanaService {
                 if (sendError.logs) {
                     console.error('[TX] Transaction logs:', sendError.logs);
                 }
+                
+                // Check if error is due to account already in use (nonce collision)
+                const isNonceError = sendError.message.includes('already in use') || 
+                                    sendError.message.includes('account already exists') ||
+                                    (sendError.logs && sendError.logs.some(log => log.includes('already in use')));
+                
+                if (isNonceError && retryCount < MAX_RETRIES) {
+                    console.warn(`[TX] Nonce collision detected! Retrying with new random nonce (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+                    // Retry with a new random nonce
+                    return this.createRealTransaction(transactionData, retryCount + 1);
+                }
+                
                 throw sendError;
             }
 
@@ -329,7 +345,7 @@ class SolanaService {
                 data_hash: hash.toString('hex'),
             };
         } catch (error) {
-            console.error('Error creating real transaction:', error);
+            console.error(`[TX] Error creating real transaction (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error.message);
             if (error.logs) {
                 console.error('[TX] Program logs:', error.logs);
             }
