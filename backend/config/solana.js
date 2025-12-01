@@ -177,37 +177,11 @@ class SolanaService {
             instructionData = Buffer.concat([instructionData, this.serializeU8(transactionData.status || 0)]);
             instructionData = Buffer.concat([instructionData, this.serializeU8(transactionData.is_test || 0)]);
 
-            // First, check if the account exists
-            const accountInfo = await this.queueRequest(async () => {
-                return await this.connection.getAccountInfo(transactionPda);
-            });
-
             const transaction = new Transaction();
-
-            // If account doesn't exist, create it first
-            if (!accountInfo) {
-                console.log(`[TX] Account does not exist, creating it...`);
-                
-                // Estimate space needed for transaction data (adjust based on your program)
-                const space = 1024; // Adjust based on your actual needs
-                const lamports = await this.queueRequest(async () => {
-                    return await this.connection.getMinimumBalanceForRentExemption(space);
-                });
-
-                const createAccountIx = SystemProgram.createAccount({
-                    fromPubkey: walletKeypair.publicKey,
-                    newAccountPubkey: transactionPda,
-                    lamports,
-                    space,
-                    programId: this.programId,
-                });
-
-                transaction.add(createAccountIx);
-                console.log(`[TX] Created account with ${lamports} lamports and ${space} bytes space`);
-            }
 
             // Create instruction with correct account order matching Anchor program
             // Order: transaction (signer, writable), authority (signer, writable), system_program (readonly)
+            // Note: The program is responsible for creating the account if it doesn't exist
             const ix = new TransactionInstruction({
                 programId: this.programId,
                 keys: [
