@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rice Journey - QR Scanner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* CSS Variables for Theme Support */
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --text-muted: #adb5bd;
+            --border-color: #dee2e6;
+            --accent-color: #008540;
+            --accent-hover: #006b35;
+            --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #2d2d30;
+            --bg-tertiary: #3e3e42;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --text-muted: #969696;
+            --border-color: #3e3e42;
+            --accent-color: #00a852;
+            --accent-hover: #008540;
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .scan-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .scan-header {
+            background: linear-gradient(135deg, var(--accent-color) 0%, #00a852 100%);
+            color: white;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            box-shadow: var(--card-shadow);
+        }
+
+        .scan-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .scan-header p {
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .scan-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #scan-results {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .scanner-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .start-btn {
+            background: #008540;
+            border: none;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 133, 64, 0.2);
+        }
+
+        .start-btn:hover {
+            background: #006b35;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 133, 64, 0.3);
+            color: white;
+        }
+
+        .start-btn:active {
+            transform: translateY(0);
+        }
+
+        /* QR Overlay */
+        .qr-overlay {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 2000;
+            display: flex;
+            align-items: stretch;
+            justify-content: stretch;
+        }
+
+        .qr-overlay-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #qr-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        .qr-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 60vw;
+            max-width: 400px;
+            height: 60vw;
+            max-height: 400px;
+            transform: translate(-50%, -50%);
+            border: 3px solid #22c55e;
+            border-radius: 16px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+            pointer-events: none;
+        }
+
+        .qr-close-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .qr-close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+        }
+
+        /* Journey Results */
+        .journey-header {
+            background: linear-gradient(135deg, #008540 0%, #00a852 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+
+        .journey-header h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .journey-header p {
+            margin: 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .journey-timeline {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .journey-timeline h5 {
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+
+        .timeline-item {
+            margin-bottom: 2rem;
+            position: relative;
+            padding-left: 2rem;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: -2rem;
+            top: 0;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px currentColor;
+        }
+
+        .timeline-item.farmer .timeline-dot {
+            background: #008540;
+            color: #008540;
+        }
+
+        .timeline-item.mill .timeline-dot {
+            background: #22c55e;
+            color: #22c55e;
+        }
+
+        .timeline-item.market .timeline-dot {
+            background: #0d9488;
+            color: #0d9488;
+        }
+
+        .timeline-item h6 {
+            margin: 0 0 0.5rem 0;
+            font-weight: 600;
+        }
+
+        .timeline-item.farmer h6 {
+            color: #008540;
+        }
+
+        .timeline-item.mill h6 {
+            color: #22c55e;
+        }
+
+        .timeline-item.market h6 {
+            color: #0d9488;
+        }
+
+        .timeline-item p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .timeline-connector {
+            position: absolute;
+            left: -1.5rem;
+            width: 2px;
+            background: #ddd;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .metric-card {
+            background: #f0fdf4;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid #22c55e;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .metric-card p:first-child {
+            margin: 0;
+            font-size: 0.8rem;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-card p:last-child {
+            margin: 0.5rem 0 0 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #008540;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .action-buttons button {
+            padding: 0.875rem;
+            border-radius: 8px;
+            font-weight: 600;
+            border: none;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .action-buttons .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .action-buttons .btn-secondary:hover {
+            background: #d1d5db;
+            color: #374151;
+        }
+
+        .action-buttons .btn-primary {
+            background: #008540;
+            color: white;
+        }
+
+        .action-buttons .btn-primary:hover {
+            background: #006b35;
+            color: white;
+        }
+
+
+        .transaction-timeline {
+            position: relative;
+            padding: 1rem 0;
+        }
+
+        .transaction-timeline::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--accent-color) 0%, transparent 100%);
+        }
+
+        .transaction-item {
+            position: relative;
+            margin-bottom: 2rem;
+            padding-left: 60px;
+        }
+
+        .transaction-item::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            width: 24px;
+            height: 24px;
+            background: var(--accent-color);
+            border: 3px solid var(--bg-primary);
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px var(--accent-color);
+        }
+
+        .transaction-item.completed::before {
+            background: var(--accent-color);
+            content: '✓';
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .transaction-item.pending::before {
+            background: #fbbf24;
+        }
+
+        .transaction-item.cancelled::before {
+            background: #ef4444;
+        }
+
+        .transaction-card {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .transaction-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.75rem;
+        }
+
+        .transaction-header h6 {
+            margin: 0;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .transaction-status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .transaction-status.completed {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        .transaction-status.pending {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+        }
+
+        .transaction-status.cancelled {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .transaction-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+        }
+
+        .transaction-detail-item {
+            font-size: 0.85rem;
+        }
+
+        .transaction-detail-item .label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .transaction-detail-item .value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .transaction-route {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        .transaction-route .actor {
+            background: var(--bg-secondary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .transaction-route .arrow {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        @media (max-width: 480px) {
+            .scan-header h1 {
+                font-size: 1.25rem;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .action-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .qr-frame {
+                width: 80vw;
+                height: 80vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="scan-container">
+        <!-- Header -->
+        <div class="scan-header">
+            <h1><i class="fas fa-leaf"></i>Rice Journey</h1>
+            <p>Scan QR codes to trace your rice supply chain</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="scan-content">
+            <!-- Scanner Section -->
+            <div id="scanner-section" class="scanner-section">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <i class="fas fa-qrcode" style="font-size: 3rem; color: #008540; margin-bottom: 1rem; display: block;"></i>
+                    <h5 style="margin-bottom: 0.5rem;">Ready to Scan</h5>
+                    <p style="color: #666; margin: 0;">Point your camera at a QR code to begin</p>
+                </div>
+                <button class="start-btn" id="scan-start-btn">
+                    <i class="fas fa-camera me-2"></i>Start Scanning
+                </button>
+            </div>
+
+            <!-- QR Overlay -->
+            <div class="qr-overlay" id="qr-overlay" style="display: none;">
+                <div class="qr-overlay-inner">
+                    <video id="qr-video" playsinline></video>
+                    <div class="qr-frame"></div>
+                    <button class="qr-close-btn" id="qr-close-btn" type="button">
+                        <i class="fas fa-times me-2"></i>Close
+                    </button>
+                </div>
+            </div>
+
+            <!-- Rice Journey Results -->
+            <div id="scan-results" style="display: none;">
+                <!-- Journey Header -->
+                <div class="journey-header">
+                    <h3><i class="fas fa-leaf me-2"></i>Rice Journey</h3>
+                    <p>Batch <strong id="scanned-batch-id-header"></strong></p>
+                </div>
+
+                <!-- Quick Summary Cards -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+                    <div style="background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: var(--card-shadow);">
+                        <p style="margin: 0; font-size: 0.8rem; opacity: 0.9; text-transform: uppercase;">Variety</p>
+                        <h4 style="margin: 0.5rem 0 0 0; font-size: 1.1rem;" id="quick-variety">-</h4>
+                    </div>
+                    <div style="background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: var(--card-shadow);">
+                        <p style="margin: 0; font-size: 0.8rem; opacity: 0.9; text-transform: uppercase;">Current Status</p>
+                        <h4 style="margin: 0.5rem 0 0 0; font-size: 1.1rem;" id="quick-status">-</h4>
+                    </div>
+                </div>
+
+                <!-- Collapsible Sections -->
+                <div class="journey-timeline">
+                    <h5><i class="fas fa-route me-2"></i>Supply Chain Journey</h5>
+                    
+                    <!-- Farmer Stage - Collapsible -->
+                    <div style="border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1rem; overflow: hidden;">
+                        <button onclick="toggleSection('farmer-section')" style="width: 100%; padding: 1rem; background: var(--bg-tertiary); border: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--accent-color);">
+                            <span><i class="fas fa-user-tie me-2"></i>Farmer Stage</span>
+                            <i class="fas fa-chevron-down" id="farmer-icon"></i>
+                        </button>
+                        <div id="farmer-section" style="display: none; padding: 1.5rem; background: var(--bg-primary);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div><strong>Planting Date:</strong> <span id="journey-planting-date">-</span></div>
+                                <div><strong>Harvest Date:</strong> <span id="journey-harvest-date">-</span></div>
+                                <div><strong>Variety:</strong> <span id="journey-variety">-</span></div>
+                                <div><strong>Total Yield:</strong> <span id="journey-yield">-</span></div>
+                                <div><strong>Irrigation:</strong> <span id="journey-irrigation">-</span></div>
+                                <div><strong>Fertilizer:</strong> <span id="journey-fertilizer">-</span></div>
+                                <div><strong>Pesticide:</strong> <span id="journey-pesticide">-</span></div>
+                                <div><strong>Carbon Smart:</strong> <span id="journey-carbon">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Drying Stage - Collapsible -->
+                    <div style="border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1rem; overflow: hidden;">
+                        <button onclick="toggleSection('drying-section')" style="width: 100%; padding: 1rem; background: var(--bg-tertiary); border: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--accent-color);">
+                            <span><i class="fas fa-wind me-2"></i>Drying Stage</span>
+                            <i class="fas fa-chevron-down" id="drying-icon"></i>
+                        </button>
+                        <div id="drying-section" style="display: none; padding: 1.5rem; background: var(--bg-primary);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div><strong>Initial Weight:</strong> <span id="journey-drying-initial-weight">-</span></div>
+                                <div><strong>Final Weight:</strong> <span id="journey-drying-final-weight">-</span></div>
+                                <div><strong>Initial Moisture:</strong> <span id="journey-drying-initial-mc">-</span></div>
+                                <div><strong>Final Moisture:</strong> <span id="journey-drying-final-mc">-</span></div>
+                                <div><strong>Duration:</strong> <span id="journey-drying-duration">-</span></div>
+                                <div><strong>Temperature:</strong> <span id="journey-drying-temp">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mill Stage - Collapsible -->
+                    <div style="border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1rem; overflow: hidden;">
+                        <button onclick="toggleSection('mill-section')" style="width: 100%; padding: 1rem; background: var(--bg-tertiary); border: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--accent-color);">
+                            <span><i class="fas fa-industry me-2"></i>Mill Stage</span>
+                            <i class="fas fa-chevron-down" id="mill-icon"></i>
+                        </button>
+                        <div id="mill-section" style="display: none; padding: 1.5rem; background: var(--bg-primary);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div><strong>Milling Type:</strong> <span id="journey-milling-type">-</span></div>
+                                <div><strong>Input Weight:</strong> <span id="journey-milling-input">-</span></div>
+                                <div><strong>Output Weight:</strong> <span id="journey-milling-output">-</span></div>
+                                <div><strong>Quality:</strong> <span id="journey-quality">-</span></div>
+                                <div><strong>Moisture:</strong> <span id="journey-moisture">-</span></div>
+                                <div><strong>Recovery:</strong> <span id="journey-recovery">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Market Stage - Collapsible -->
+                    <div style="border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1rem; overflow: hidden;">
+                        <button onclick="toggleSection('market-section')" style="width: 100%; padding: 1rem; background: var(--bg-tertiary); border: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--accent-color);">
+                            <span><i class="fas fa-store me-2"></i>Market Stage</span>
+                            <i class="fas fa-chevron-down" id="market-icon"></i>
+                        </button>
+                        <div id="market-section" style="display: none; padding: 1.5rem; background: var(--bg-primary);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div><strong>Current Holder:</strong> <span id="journey-holder">-</span></div>
+                                <div><strong>Contact:</strong> <span id="journey-contact">-</span></div>
+                                <div><strong>Status:</strong> <span id="journey-status">-</span></div>
+                                <div><strong>Price/KG:</strong> <span id="journey-price">-</span></div>
+                                <div><strong>Batch Weight:</strong> <span id="journey-batch-weight">-</span></div>
+                                <div><strong>Last Updated:</strong> <span id="journey-updated">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Key Metrics -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <p>QR Code</p>
+                        <p id="journey-batch-id" style="font-size: 0.9rem; word-break: break-all;">-</p>
+                    </div>
+                    <div class="metric-card">
+                        <p>Current Weight</p>
+                        <p id="journey-weight">-</p>
+                    </div>
+                </div>
+
+                <!-- Transaction History -->
+                <div style="margin-top: 2rem; flex: 1; display: flex; flex-direction: column;">
+                    <h5 style="color: var(--text-primary); margin-bottom: 1.5rem;"><i class="fas fa-exchange-alt me-2"></i>Journey History</h5>
+                    <div id="transaction-history" class="transaction-timeline" style="flex: 1; overflow-y: auto; padding-right: 0.5rem;">
+                        <p class="text-muted small" style="text-align: center; padding: 2rem;">No transactions available</p>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons" style="margin-top: 1.5rem;">
+                    <button class="btn-secondary" onclick="resetScan()" style="width: 100%;">
+                        <i class="fas fa-redo me-2"></i>Scan Again
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Configuration
+        const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api`;
+        const EXTERNAL_API_URL = "https://digisaka.app/api/mobile/trace/batch";
+        let recentScans = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('scan-start-btn').addEventListener('click', startQRScanner);
+            document.getElementById('qr-close-btn').addEventListener('click', stopQRScanner);
+        });
+
+        // Fetch batch data from API
+        async function fetchBatchData(batchId) {
+            try {
+                // Try external API first
+                const externalResponse = await fetch(`${EXTERNAL_API_URL}/${batchId}`);
+                if (externalResponse.ok) {
+                    const result = await externalResponse.json();
+                    console.log('Data from external API:', result);
+                    return result;
+                }
+                
+                // Try local rice-batches API
+                const response = await fetch(`${API_BASE_URL}/rice-batches/${batchId}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    return result.data;
+                }
+                
+                // Try local transactions API
+                const transResponse = await fetch(`${API_BASE_URL}/transactions`);
+                if (transResponse.ok) {
+                    const transResult = await transResponse.json();
+                    const transaction = transResult.data.find(t => 
+                        t.batch_ids && t.batch_ids.includes(parseInt(batchId))
+                    );
+                    return transaction;
+                }
+                
+                return null;
+            } catch (error) {
+                console.error('Error fetching batch data:', error);
+                return null;
+            }
+        }
+
+        // QR Scanner Functions
+        async function startQRScanner() {
+            const overlay = document.getElementById('qr-overlay');
+            const video = document.getElementById('qr-video');
+            
+            overlay.style.display = 'flex';
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                
+                video.srcObject = stream;
+                video.play();
+                scanQRCode(video);
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Unable to access camera. Please check permissions.');
+            }
+        }
+
+        function stopQRScanner() {
+            const overlay = document.getElementById('qr-overlay');
+            const video = document.getElementById('qr-video');
+            
+            if (video && video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            
+            overlay.style.display = 'none';
+        }
+
+        function scanQRCode(video) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            let isScanning = true;
+            
+            function scan() {
+                if (!isScanning) return;
+                
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+                    
+                    if (code) {
+                        isScanning = false;
+                        handleQRCodeScanned(code.data);
+                        return;
+                    }
+                }
+                
+                requestAnimationFrame(scan);
+            }
+            
+            scan();
+        }
+
+        function handleQRCodeScanned(qrCode, dataObj) {
+            stopQRScanner();
+            
+            let batchId = qrCode;
+            let scannedData = dataObj || { raw: qrCode };
+            
+            // If dataObj is not provided, try to parse qrCode as JSON
+            if (!dataObj) {
+                try {
+                    scannedData = JSON.parse(qrCode);
+                    batchId = scannedData.qr_code || scannedData.batch_id || scannedData.id || qrCode;
+                } catch (e) {
+                    scannedData = { raw: qrCode };
+                    batchId = qrCode;
+                }
+            }
+            
+            recentScans.unshift({
+                batchId: batchId,
+                data: scannedData,
+                timestamp: new Date().toLocaleTimeString()
+            });
+            
+            if (recentScans.length > 10) {
+                recentScans.pop();
+            }
+            
+            displayScanResults(batchId, scannedData);
+        }
+
+        function displayScanResults(batchId, data) {
+            document.getElementById('scanner-section').style.display = 'none';
+            document.getElementById('scan-results').style.display = 'block';
+            
+            // Extract nested data
+            const season = data.season || {};
+            const milling = data.milling || {};
+            const drying = data.drying || {};
+            const holder = data.current_holder || {};
+            
+            // Batch ID - use QR code or provided ID
+            const displayBatchId = data.qr_code || batchId || '-';
+            document.getElementById('scanned-batch-id-header').textContent = displayBatchId;
+            document.getElementById('journey-batch-id').textContent = displayBatchId;
+            
+            // ===== FARMER STAGE =====
+            document.getElementById('journey-planting-date').textContent = season.planting_date || '-';
+            document.getElementById('journey-harvest-date').textContent = season.harvest_date || '-';
+            document.getElementById('journey-variety').textContent = season.variety || '-';
+            document.getElementById('journey-yield').textContent = season.total_yield_kg ? season.total_yield_kg + ' kg' : '-';
+            document.getElementById('journey-irrigation').textContent = season.irrigation_practice ? season.irrigation_practice.replace(/_/g, ' ') : '-';
+            document.getElementById('journey-fertilizer').textContent = season.fertilizer_used || '-';
+            document.getElementById('journey-pesticide').textContent = season.pesticide_used || '-';
+            document.getElementById('journey-carbon').textContent = season.carbon_smart_certified ? 'Yes' : 'No';
+            
+            // ===== DRYING STAGE =====
+            document.getElementById('journey-drying-initial-weight').textContent = drying.initial_weight ? drying.initial_weight + ' kg' : '-';
+            document.getElementById('journey-drying-final-weight').textContent = drying.final_weight ? drying.final_weight + ' kg' : '-';
+            document.getElementById('journey-drying-initial-mc').textContent = drying.initial_mc ? drying.initial_mc + '%' : '-';
+            document.getElementById('journey-drying-final-mc').textContent = drying.final_mc ? drying.final_mc + '%' : '-';
+            document.getElementById('journey-drying-duration').textContent = drying.duration ? drying.duration + ' hours' : '-';
+            document.getElementById('journey-drying-temp').textContent = drying.temperature ? drying.temperature + '°C' : '-';
+            
+            // ===== MILL STAGE =====
+            document.getElementById('journey-milling-type').textContent = milling.milling_type || '-';
+            document.getElementById('journey-milling-input').textContent = milling.total_weight_kg ? milling.total_weight_kg + ' kg' : '-';
+            document.getElementById('journey-milling-output').textContent = milling.total_weight_processed_kg ? milling.total_weight_processed_kg + ' kg' : '-';
+            document.getElementById('journey-quality').textContent = milling.quality || '-';
+            document.getElementById('journey-moisture').textContent = (milling.moisture || data.moisture_content || '-') + '%';
+            document.getElementById('journey-recovery').textContent = milling.recovery ? milling.recovery + '%' : '-';
+            
+            // ===== MARKET STAGE =====
+            document.getElementById('journey-holder').textContent = holder.name || '-';
+            document.getElementById('journey-contact').textContent = holder.contact_number || '-';
+            const statusDisplay = data.status ? data.status.replace(/_/g, ' ').toUpperCase() : 'Active';
+            document.getElementById('journey-status').textContent = statusDisplay;
+            document.getElementById('journey-price').textContent = data.price_per_kg ? '₱' + data.price_per_kg + '/kg' : '-';
+            document.getElementById('journey-batch-weight').textContent = data.batch_weight_kg ? data.batch_weight_kg + ' kg' : '-';
+            document.getElementById('journey-updated').textContent = data.updated_at ? new Date(data.updated_at).toLocaleDateString() : new Date().toLocaleDateString();
+            
+            // Weight
+            document.getElementById('journey-weight').textContent = (data.batch_weight_kg || season.total_yield_kg || '-') + ' kg';
+            
+            // Quick Summary
+            document.getElementById('quick-variety').textContent = season.variety || '-';
+            document.getElementById('quick-status').textContent = statusDisplay;
+            
+            // Fetch and display transactions
+            fetchAndDisplayTransactions(data.id || displayBatchId);
+        }
+
+        // Toggle collapsible sections
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const icon = document.getElementById(sectionId.replace('-section', '-icon'));
+            
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                section.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Fetch transactions from API
+        async function fetchAndDisplayTransactions(batchId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/transactions`);
+                if (response.ok) {
+                    const result = await response.json();
+                    const transactions = result.data || [];
+                    
+                    // Filter transactions for this batch
+                    const batchTransactions = transactions.filter(t => 
+                        t.batch_ids && t.batch_ids.includes(parseInt(batchId))
+                    );
+                    
+                    displayTransactions(batchTransactions);
+                }
+            } catch (error) {
+                console.error('Error fetching transactions:', error);
+            }
+        }
+
+        // Display transactions as journey timeline
+        function displayTransactions(transactions) {
+            const container = document.getElementById('transaction-history');
+            
+            if (!transactions || transactions.length === 0) {
+                container.innerHTML = '<p class="text-muted small" style="text-align: center; padding: 2rem;">No transactions available</p>';
+                return;
+            }
+            
+            // Sort transactions by date (newest first)
+            const sorted = [...transactions].sort((a, b) => {
+                const dateA = new Date(a.transaction_date || 0);
+                const dateB = new Date(b.transaction_date || 0);
+                return dateB - dateA;
+            });
+            
+            container.innerHTML = sorted.map((tx, index) => {
+                const date = tx.transaction_date ? new Date(tx.transaction_date) : new Date();
+                const statusClass = tx.status === '1' || tx.status === 'completed' ? 'completed' : 
+                                   tx.status === '2' || tx.status === 'pending' ? 'pending' : 'cancelled';
+                const statusText = statusClass === 'completed' ? 'Completed' : 
+                                  statusClass === 'pending' ? 'Pending' : 'Cancelled';
+                
+                return `
+                    <div class="transaction-item ${statusClass}">
+                        <div class="transaction-card">
+                            <div class="transaction-header">
+                                <h6><i class="fas fa-box me-1"></i>Transfer ${index + 1}</h6>
+                                <span class="transaction-status ${statusClass}">${statusText}</span>
+                            </div>
+                            
+                            <div class="transaction-route">
+                                <span class="actor">Actor ${tx.from_actor_id || '-'}</span>
+                                <span class="arrow">→</span>
+                                <span class="actor">Actor ${tx.to_actor_id || '-'}</span>
+                            </div>
+                            
+                            <div class="transaction-details">
+                                <div class="transaction-detail-item">
+                                    <span class="label">Date</span>
+                                    <span class="value">${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                </div>
+                                <div class="transaction-detail-item">
+                                    <span class="label">Quantity</span>
+                                    <span class="value">${tx.quantity || '-'} kg</span>
+                                </div>
+                                <div class="transaction-detail-item">
+                                    <span class="label">Quality</span>
+                                    <span class="value">${tx.quality || '-'}</span>
+                                </div>
+                                <div class="transaction-detail-item">
+                                    <span class="label">Moisture</span>
+                                    <span class="value">${tx.moisture || '-'}%</span>
+                                </div>
+                                <div class="transaction-detail-item">
+                                    <span class="label">Price/KG</span>
+                                    <span class="value">₱${tx.unit_price || '-'}</span>
+                                </div>
+                                <div class="transaction-detail-item">
+                                    <span class="label">Signature</span>
+                                    <span class="value" style="font-size: 0.75rem; word-break: break-all;">${tx.signature ? tx.signature.substring(0, 16) + '...' : '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+
+        function resetScan() {
+            document.getElementById('scanner-section').style.display = 'block';
+            document.getElementById('scan-results').style.display = 'none';
+        }
+
+        function viewBatchDetails() {
+            const batchId = document.getElementById('scanned-batch-id-header').textContent;
+            if (batchId) {
+                window.location.href = `${window.location.origin}/batch-tracker`;
+            }
+        }
+    </script>
+</body>
+</html>

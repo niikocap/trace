@@ -92,6 +92,11 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', message: 'Rice Supply Chain API is running' });
 });
 
+// Serve scan.html for /scan route
+app.get('/scan', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/scan.html'));
+});
+
 // Serve frontend for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/index.html'));

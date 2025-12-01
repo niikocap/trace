@@ -5,9 +5,19 @@
 const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api`;
 const API_EXTERNAL_URL = "https://digisaka.app";
 
+// Session Management
+const SESSION_KEY = 'riceSCM_session';
+const REMEMBER_KEY = 'riceSCM_remember';
+
+// Demo credentials
+const DEMO_CREDENTIALS = {
+    admin: '!Asdasd123'
+};
+
 // Global variables
 let currentSection = 'dashboard';
 let currentEntity = null;
+let currentUser = null;
 let transactionsPaginationState = {
     allData: [],
     filteredData: [],
@@ -39,22 +49,274 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function initializeApp() {
-    setupEventListeners();
-    initializeTheme();
-    initializeApiTester();
-    // Handle URL-based routing
-    handleUrlRouting();
-    // Listen for browser back/forward buttons
-    window.addEventListener('popstate', handleUrlRouting);
+    const path = window.location.pathname;
+    const pathSegments = path.split('/').filter(segment => segment.length > 0);
+    const firstSegment = pathSegments[0];
+    
+    // Public routes that don't require login
+    const publicRoutes = ['login', 'scan'];
+    const isPublicRoute = publicRoutes.includes(firstSegment);
+    
+    // Check if user is logged in
+    if (!isUserLoggedIn()) {
+        // Allow access to public routes without login
+        if (isPublicRoute) {
+            // Hide navbar and sidebar for public routes
+            const navbar = document.querySelector('.top-navbar');
+            const sidebar = document.querySelector('.sidebar');
+            const mainContent = document.querySelector('.main-content');
+            
+            if (navbar) {
+                navbar.style.display = 'none !important';
+                navbar.style.visibility = 'hidden';
+                navbar.style.height = '0';
+            }
+            if (sidebar) {
+                sidebar.style.display = 'none !important';
+                sidebar.style.visibility = 'hidden';
+            }
+            if (mainContent) {
+                mainContent.style.marginLeft = '0 !important';
+                mainContent.style.paddingTop = '1rem !important';
+                mainContent.style.marginTop = '0 !important';
+            }
+            
+            showAppContainer();
+            setupEventListeners();
+            initializeTheme();
+            initializeApiTester();
+            handleUrlRouting();
+            window.addEventListener('popstate', handleUrlRouting);
+        } else {
+            // Redirect to login page for protected routes
+            if (path !== '/login' && path !== '/') {
+                window.history.replaceState({ section: 'login' }, '', '/login');
+            }
+            showLoginPage();
+            setupLoginEventListeners();
+        }
+    } else {
+        // User is logged in
+        showAppContainer();
+        setupEventListeners();
+        initializeTheme();
+        initializeApiTester();
+        
+        // If on login page, redirect to chain-transactions
+        if (path === '/login' || path === '/') {
+            window.history.replaceState({ section: 'chain-transactions' }, '', '/chain-transactions');
+        }
+        
+        // Handle URL-based routing
+        handleUrlRouting();
+        // Listen for browser back/forward buttons
+        window.addEventListener('popstate', handleUrlRouting);
+    }
 }
 
-// Handle URL-based routing
+// Session Management Functions
+function isUserLoggedIn() {
+    const session = localStorage.getItem(SESSION_KEY);
+    return session !== null;
+}
+
+function getSession() {
+    const session = localStorage.getItem(SESSION_KEY);
+    return session ? JSON.parse(session) : null;
+}
+
+function saveSession(username) {
+    const session = {
+        username: username,
+        loginTime: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    currentUser = session;
+}
+
+function clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(REMEMBER_KEY);
+    currentUser = null;
+}
+
+function showLoginPage() {
+    const loginPage = document.getElementById('login-page');
+    const appContainer = document.getElementById('app-container');
+    if (loginPage) loginPage.style.display = 'flex';
+    if (appContainer) appContainer.style.display = 'none';
+}
+
+function showAppContainer() {
+    const loginPage = document.getElementById('login-page');
+    const appContainer = document.getElementById('app-container');
+    if (loginPage) loginPage.style.display = 'none';
+    if (appContainer) appContainer.style.display = 'block';
+    
+    // Update user display name and logout button
+    const session = getSession();
+    const userDisplay = document.getElementById('user-display-name');
+    const logoutBtn = document.getElementById('logout-btn');
+    const navbar = document.querySelector('.top-navbar');
+    const sidebar = document.querySelector('.sidebar');
+    const mainContent = document.querySelector('.main-content');
+    
+    if (session) {
+        if (userDisplay) {
+            userDisplay.textContent = session.username.charAt(0).toUpperCase() + session.username.slice(1);
+        }
+        if (logoutBtn) {
+            logoutBtn.style.display = 'block';
+        }
+        // Show navbar and sidebar for logged-in users
+        if (navbar) navbar.style.display = 'block';
+        if (sidebar) sidebar.style.display = 'block';
+        if (mainContent) {
+            mainContent.style.marginLeft = '280px';
+            mainContent.style.paddingTop = '80px';
+        }
+    } else {
+        // No session - hide user info and logout button
+        if (userDisplay) {
+            userDisplay.textContent = 'Guest';
+        }
+        if (logoutBtn) {
+            logoutBtn.style.display = 'none';
+        }
+        // Hide navbar and sidebar for public routes
+        if (navbar) navbar.style.display = 'none';
+        if (sidebar) sidebar.style.display = 'none';
+        if (mainContent) {
+            mainContent.style.marginLeft = '0';
+            mainContent.style.paddingTop = '1rem';
+        }
+    }
+}
+
+function setupLoginEventListeners() {
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+}
+
+function handleLogin(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const rememberMe = document.getElementById('remember-me').checked;
+    const errorDiv = document.getElementById('login-error');
+    const errorText = document.getElementById('login-error-text');
+    
+    // Validate credentials
+    if (DEMO_CREDENTIALS[username] && DEMO_CREDENTIALS[username] === password) {
+        // Valid login
+        saveSession(username);
+        
+        if (rememberMe) {
+            localStorage.setItem(REMEMBER_KEY, username);
+        }
+        
+        // Hide error
+        errorDiv.classList.add('d-none');
+        
+        // Redirect to app
+        showAppContainer();
+        setupEventListeners();
+        initializeTheme();
+        initializeApiTester();
+        
+        // Redirect to chain-transactions after login
+        window.history.replaceState({ section: 'chain-transactions' }, '', '/chain-transactions');
+        showSection('chain-transactions');
+        
+        window.addEventListener('popstate', handleUrlRouting);
+        
+        // Clear form
+        document.getElementById('login-form').reset();
+    } else {
+        // Invalid login
+        errorText.textContent = 'Invalid username or password. Try admin / !Asdasd123';
+        errorDiv.classList.remove('d-none');
+    }
+}
+
+function handleLogout() {
+    if (confirm('Are you sure you want to logout?')) {
+        clearSession();
+        showLoginPage();
+        setupLoginEventListeners();
+        
+        // Clear form
+        document.getElementById('login-form').reset();
+        document.getElementById('login-error').classList.add('d-none');
+    }
+}
+
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('login-password');
+    const toggleIcon = document.getElementById('password-toggle-icon');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleIcon.classList.remove('fa-eye');
+        toggleIcon.classList.add('fa-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        toggleIcon.classList.remove('fa-eye-slash');
+        toggleIcon.classList.add('fa-eye');
+    }
+}
+
+// Handle URL-based routing with session protection
 function handleUrlRouting() {
     const path = window.location.pathname;
     const pathSegments = path.split('/').filter(segment => segment.length > 0);
     
+    // Get the first segment to check for special routes
+    const firstSegment = pathSegments[0];
+    
+    // Public routes that don't require login
+    const publicRoutes = ['login', 'scan'];
+    
+    // Check if user is trying to access login route
+    if (firstSegment === 'login') {
+        if (isUserLoggedIn()) {
+            // Already logged in, redirect to chain-transactions
+            window.history.replaceState({ section: 'chain-transactions' }, '', '/chain-transactions');
+            showAppContainer();
+            showSection('chain-transactions');
+        } else {
+            // Show login page
+            showLoginPage();
+        }
+        return;
+    }
+    
+    // Check if route is public
+    const isPublicRoute = publicRoutes.includes(firstSegment);
+    
+    if (isPublicRoute) {
+        // Public route - show app container and load the section
+        if (!isUserLoggedIn()) {
+            showAppContainer(); // Show app UI without requiring login
+        }
+        // Proceed with normal routing
+    } else {
+        // Protected route - require login
+        if (!isUserLoggedIn()) {
+            // Redirect to login
+            window.history.replaceState({ section: 'login' }, '', '/login');
+            showLoginPage();
+            setupLoginEventListeners();
+            return;
+        }
+    }
+    
     // Get the last segment as the section name
-    let section = pathSegments[pathSegments.length - 1] || 'chain-transactions';
+    let section = pathSegments[pathSegments.length - 1] || 'dashboard';
     
     // Map URL paths to section names
     const sectionMap = {
@@ -71,15 +333,16 @@ function handleUrlRouting() {
         'tester': 'api-tester',
         'batch-tracker': 'batch-tracker',
         'tracker': 'batch-tracker',
+        'scan': 'scan',
         'drying-data': 'drying-data',
         'drying': 'drying-data',
         'transaction-summary': 'transaction-summary',
         'summary': 'transaction-summary',
         'dashboard': 'dashboard',
-        '': 'chain-transactions'
+        '': 'dashboard'
     };
     
-    const mappedSection = sectionMap[section] || 'chain-transactions';
+    const mappedSection = sectionMap[section] || 'dashboard';
     showSection(mappedSection);
 }
 
@@ -358,17 +621,26 @@ function setupEventListeners() {
     });
 
     // Add button
-    document.getElementById('add-btn').addEventListener('click', function () {
-        openModal('add');
-    });
+    const addBtn = document.getElementById('add-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', function () {
+            openModal('add');
+        });
+    }
 
     // Save button
-    document.getElementById('saveBtn').addEventListener('click', function () {
-        saveEntity();
-    });
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function () {
+            saveEntity();
+        });
+    }
 
     // Search inputs
     setupSearchListeners();
+    
+    // Initialize scan section
+    initializeScanSection();
 }
 
 // Setup search listeners
@@ -396,11 +668,14 @@ function showSection(section) {
     // Update browser URL
     updateBrowserUrl(section);
     
-    // Update active nav link
+    // Update active nav link (only if it exists)
     document.querySelectorAll('.nav-link').forEach(link => {
         link.classList.remove('active');
     });
-    document.querySelector(`[data-section="${section}"]`).classList.add('active');
+    const navLink = document.querySelector(`[data-section="${section}"]`);
+    if (navLink) {
+        navLink.classList.add('active');
+    }
 
     // Hide all sections
     document.querySelectorAll('.content-section').forEach(sec => {
@@ -420,14 +695,15 @@ function showSection(section) {
         'chain-transactions': 'Chain Transactions',
         'api-tester': 'API Tester',
         'batch-tracker': 'Batch Tracker',
+        'scan': 'QR Code Scanner',
         'drying-data': 'Drying Data',
         'transaction-summary': 'Transaction Summary'
     };
 
-    document.getElementById('page-title').textContent = titles[section];
+    document.getElementById('page-title').textContent = titles[section] || section;
 
     const addBtn = document.getElementById('add-btn');
-    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker' || section === 'chain-transactions' || section === 'drying-data' || section === 'transaction-summary') {
+    if (section === 'dashboard' || section === 'api-tester' || section === 'batch-tracker' || section === 'scan' || section === 'chain-transactions' || section === 'drying-data' || section === 'transaction-summary') {
         addBtn.style.display = 'none';
     } else {
         addBtn.style.display = 'block';
@@ -462,6 +738,9 @@ function showSection(section) {
         case 'batch-tracker':
             loadBatchTracker();
             loadTransactionSummary();
+            break;
+        case 'scan':
+            // Scan section is initialized in setupEventListeners
             break;
         case 'drying-data':
             loadDryingData();
@@ -5107,4 +5386,190 @@ function removeChip(fieldName, value) {
     values = values.filter(v => v !== value);
     input.value = JSON.stringify(values);
     renderChips(fieldName, values);
+}
+
+// QR Scanner Functionality for /scan route
+let recentScans = [];
+
+function initializeScanSection() {
+    const scanStartBtn = document.getElementById('scan-start-btn');
+    const qrCloseBtn = document.getElementById('qr-close-btn');
+    
+    if (scanStartBtn) {
+        scanStartBtn.addEventListener('click', startQRScanner);
+    }
+    if (qrCloseBtn) {
+        qrCloseBtn.addEventListener('click', stopQRScanner);
+    }
+}
+
+async function startQRScanner() {
+    const overlay = document.getElementById('qr-overlay');
+    const video = document.getElementById('qr-video');
+    
+    if (!overlay || !video) return;
+    
+    overlay.style.display = 'flex';
+    
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        });
+        
+        video.srcObject = stream;
+        video.play();
+        
+        // Start scanning
+        scanQRCode(video);
+    } catch (error) {
+        console.error('Error accessing camera:', error);
+        showToast('Error', 'Unable to access camera. Please check permissions.', 'danger');
+    }
+}
+
+function stopQRScanner() {
+    const overlay = document.getElementById('qr-overlay');
+    const video = document.getElementById('qr-video');
+    
+    if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+    }
+    
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+function scanQRCode(video) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    let isScanning = true;
+    
+    function scan() {
+        if (!isScanning) return;
+        
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            
+            if (code) {
+                isScanning = false;
+                handleQRCodeScanned(code.data);
+                return;
+            }
+        }
+        
+        requestAnimationFrame(scan);
+    }
+    
+    scan();
+}
+
+function handleQRCodeScanned(data) {
+    stopQRScanner();
+    
+    // Parse QR data (could be batch ID or full JSON)
+    let batchId = data;
+    let scannedData = { raw: data };
+    
+    // Try to parse as JSON
+    try {
+        scannedData = JSON.parse(data);
+        batchId = scannedData.batch_id || scannedData.id || data;
+    } catch (e) {
+        // Not JSON, treat as plain batch ID
+        batchId = data;
+    }
+    
+    // Add to recent scans
+    recentScans.unshift({
+        batchId: batchId,
+        data: scannedData,
+        timestamp: new Date().toLocaleTimeString()
+    });
+    
+    // Keep only last 10 scans
+    if (recentScans.length > 10) {
+        recentScans.pop();
+    }
+    
+    // Display results
+    displayScanResults(batchId, scannedData);
+    updateRecentScansList();
+}
+
+function displayScanResults(batchId, data) {
+    const resultsDiv = document.getElementById('scan-results');
+    if (!resultsDiv) return;
+    
+    // Update header
+    const headerBatchId = document.getElementById('scanned-batch-id-header');
+    if (headerBatchId) headerBatchId.textContent = batchId;
+    
+    // Update journey timeline
+    document.getElementById('journey-batch-id').textContent = batchId || '-';
+    document.getElementById('journey-harvest-date').textContent = data.harvest_date || data.transaction_date || '-';
+    document.getElementById('journey-variety').textContent = data.variety || data.rice_variety || '-';
+    document.getElementById('journey-yield').textContent = data.quantity || data.yield || '-';
+    
+    document.getElementById('journey-milling-date').textContent = data.milling_date || data.transaction_date || '-';
+    document.getElementById('journey-quality').textContent = data.quality || '-';
+    document.getElementById('journey-moisture').textContent = (data.moisture || '-') + (data.moisture ? '%' : '');
+    
+    document.getElementById('journey-status').textContent = data.status || 'Active';
+    document.getElementById('journey-price').textContent = data.price_per_kg || data.unit_price || '-';
+    document.getElementById('journey-updated').textContent = data.transaction_date || new Date().toLocaleDateString();
+    
+    document.getElementById('journey-weight').textContent = (data.quantity || data.total_weight_kg || '-') + ' kg';
+    
+    resultsDiv.style.display = 'block';
+}
+
+function updateRecentScansList() {
+    const list = document.getElementById('recent-scans-list');
+    if (!list) return;
+    
+    if (recentScans.length === 0) {
+        list.innerHTML = '<p class="text-muted small">No scans yet</p>';
+        return;
+    }
+    
+    list.innerHTML = recentScans.map((scan, index) => `
+        <a href="#" class="list-group-item list-group-item-action" onclick="selectRecentScan(${index}); return false;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1"><i class="fas fa-barcode me-2"></i>Batch: ${scan.batchId}</h6>
+                    <small class="text-muted">${scan.timestamp}</small>
+                </div>
+                <i class="fas fa-chevron-right text-muted"></i>
+            </div>
+        </a>
+    `).join('');
+}
+
+function selectRecentScan(index) {
+    const scan = recentScans[index];
+    displayScanResults(scan.batchId, scan.data);
+}
+
+function resetScan() {
+    const resultsDiv = document.getElementById('scan-results');
+    if (resultsDiv) {
+        resultsDiv.style.display = 'none';
+    }
+}
+
+function viewBatchDetails() {
+    const batchId = document.getElementById('scanned-batch-id').textContent;
+    if (batchId) {
+        // Navigate to batch-tracker with the scanned batch ID
+        updateBrowserUrl('batch-tracker');
+        showSection('batch-tracker');
+        // Optionally, you could pre-select the batch in batch-tracker
+        // This would require additional implementation in the batch-tracker section
+    }
 }

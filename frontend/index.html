@@ -16,6 +16,74 @@
 </head>
 
 <body>
+    <!-- Login Page -->
+    <div id="login-page" class="login-container">
+        <div class="login-wrapper">
+            <div class="login-image-section">
+                <img src="images/login_banner.jpg" alt="Rice Supply Chain" class="login-banner">
+                <div class="login-overlay">
+                    <div class="login-branding">
+                        <i class="fas fa-seedling"></i>
+                        <h1>DigiSaka TRACE</h1>
+                        <p>Rice Supply Chain Management System</p>
+                    </div>
+                </div>
+            </div>
+            <div class="login-form-section">
+                <div class="login-form-container">
+                    <div class="login-header">
+                        <h2>Welcome Back</h2>
+                        <p class="text-muted">Sign in to your account to continue</p>
+                    </div>
+                    
+                    <form id="login-form" onsubmit="handleLogin(event)">
+                        <div class="form-group mb-4">
+                            <label for="login-username" class="form-label">
+                                <i class="fas fa-user me-2"></i>Username
+                            </label>
+                            <input type="text" class="form-control form-control-lg" id="login-username" placeholder="Enter your username" required autocomplete="username">
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="login-password" class="form-label">
+                                <i class="fas fa-lock me-2"></i>Password
+                            </label>
+                            <div class="password-input-wrapper">
+                                <input type="password" class="form-control form-control-lg" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+                                <button class="btn-password-toggle" type="button" onclick="togglePasswordVisibility()" title="Toggle password visibility">
+                                    <i class="fas fa-eye" id="password-toggle-icon"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="remember-me">
+                            <label class="form-check-label" for="remember-me">
+                                Remember me for 24 hours
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mb-4">
+                            <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                        </button>
+
+                        <div id="login-error" class="alert alert-danger d-none" role="alert">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            <span id="login-error-text"></span>
+                        </div>
+
+                        <div class="login-footer">
+                            <p class="text-muted small mb-0">Demo Credentials:</p>
+                            <p class="text-muted small"><strong>Username:</strong> admin | <strong>Password:</strong> !Asdasd123</p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application (Hidden until logged in) -->
+    <div id="app-container" style="display: none;">
     <!-- Top Navigation Bar -->
     <nav class="navbar navbar-expand-lg fixed-top top-navbar">
         <div class="container-fluid px-4">
@@ -35,11 +103,14 @@
                     <i class="fas fa-moon" id="themeIcon"></i>
                 </button>
 
-                <div class="d-flex align-items-center d-none d-sm-flex">
-                    <span class="text-muted small me-2">Welcome back</span>
-                    <div class="user-avatar">
+                <div class="d-flex align-items-center d-none d-sm-flex gap-2">
+                    <span class="text-muted small me-2">Welcome, <strong id="user-display-name">User</strong></span>
+                    <div class="user-avatar" id="user-avatar-btn" style="cursor: pointer;" title="User menu">
                         <i class="fas fa-user"></i>
                     </div>
+                    <button class="btn btn-outline-danger btn-sm" id="logout-btn" onclick="handleLogout()" title="Logout">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </button>
                 </div>
             </div>
         </div>
@@ -636,52 +707,6 @@
 
         <!-- Batch Tracker Section -->
         <div id="batch-tracker-section" class="content-section" style="display: none;">
-            <!-- Transaction Summary at Top (kept for reference) -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5><i class="fas fa-file-invoice me-2"></i>Transaction Summary</h5>
-                    <div class="d-flex gap-2 align-items-center">
-                        <div>
-                            <label class="form-label small mb-0 me-2">Date From:</label>
-                            <input type="date" class="form-control form-control-sm d-inline-block" id="transaction-summary-date-from" style="width: 150px;" value="">
-                        </div>
-                        <div>
-                            <label class="form-label small mb-0 me-2">Date To:</label>
-                            <input type="date" class="form-control form-control-sm d-inline-block" id="transaction-summary-date-to" style="width: 150px;" value="">
-                        </div>
-                        <select class="form-select form-select-sm d-inline-block" id="transaction-filter" style="width: 150px;">
-                            <option value="all" selected>All</option>
-                            <option value="blo">BLO</option>
-                            <option value="coop">COOP</option>
-                            <option value="buyback">Buyback</option>
-                            <option value="individual">Individual</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover" id="transaction-summary-table">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>Season</th>
-                                    <th>Farmers Name</th>
-                                    <th>Address</th>
-                                    <th>HA</th>
-                                    <th>Variety</th>
-                                    <th>KGS</th>
-                                    <th>Price/KG</th>
-                                    <th>Fresh Harvest</th>
-                                    <th>Badge</th>
-                                </tr>
-                            </thead>
-                            <tbody id="transaction-summary-tbody">
-                                <!-- Data will be loaded here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
             <div class="row">
                 <div class="col-md-4">
                     <div class="card">
@@ -977,6 +1002,120 @@
         </div>
     </div>
 
+    <!-- Scan Section (Mobile QR Scanner) -->
+    <div id="scan-section" class="content-section" style="display: block;">
+        <div class="card" style="background: white; border: 1px solid #dee2e6;">
+            <div class="card-header">
+                <h5><i class="fas fa-qrcode me-2"></i>QR Code Scanner</h5>
+                <small class="text-muted">Scan batch QR codes to track items</small>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <button class="btn btn-primary btn-lg" id="scan-start-btn" type="button">
+                        <i class="fas fa-camera me-2"></i>Start Scanning
+                    </button>
+                </div>
+
+                <!-- QR Scanner Overlay (Hidden by default) -->
+                <div class="qr-overlay" id="qr-overlay" style="display: none;">
+                    <div class="qr-overlay-inner">
+                        <video id="qr-video" playsinline></video>
+                        <div class="qr-frame"></div>
+                        <button class="btn btn-danger qr-close-btn" id="qr-close-btn" type="button">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Rice Journey Results -->
+                <div id="scan-results" style="display: none;">
+                    <!-- Journey Header -->
+                    <div style="background: linear-gradient(135deg, #008540 0%, #00a852 100%); color: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0 0 0.5rem 0;"><i class="fas fa-leaf me-2"></i>Rice Journey</h3>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Batch <strong id="scanned-batch-id-header"></strong></p>
+                    </div>
+
+                    <!-- Journey Timeline -->
+                    <div style="background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                        <h5 style="margin-bottom: 1.5rem;"><i class="fas fa-route me-2"></i>Supply Chain Journey</h5>
+                        
+                        <!-- Timeline -->
+                        <div style="position: relative; padding-left: 2rem;">
+                            <!-- Farmer Stage -->
+                            <div style="margin-bottom: 2rem; position: relative;">
+                                <div style="position: absolute; left: -2rem; top: 0; width: 1rem; height: 1rem; background: #008540; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 2px #008540;"></div>
+                                <h6 style="margin: 0 0 0.5rem 0; color: #008540;"><i class="fas fa-user-tie me-1"></i>Farmer</h6>
+                                <p style="margin: 0; font-size: 0.9rem; color: #666;">
+                                    <strong>Harvest Date:</strong> <span id="journey-harvest-date">-</span><br>
+                                    <strong>Variety:</strong> <span id="journey-variety">-</span><br>
+                                    <strong>Yield:</strong> <span id="journey-yield">-</span>
+                                </p>
+                            </div>
+
+                            <!-- Connector Line -->
+                            <div style="position: absolute; left: -1.5rem; top: 3rem; width: 2px; height: 2rem; background: #ddd;"></div>
+
+                            <!-- Mill Stage -->
+                            <div style="margin-bottom: 2rem; position: relative;">
+                                <div style="position: absolute; left: -2rem; top: 0; width: 1rem; height: 1rem; background: #22c55e; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 2px #22c55e;"></div>
+                                <h6 style="margin: 0 0 0.5rem 0; color: #22c55e;"><i class="fas fa-industry me-1"></i>Mill</h6>
+                                <p style="margin: 0; font-size: 0.9rem; color: #666;">
+                                    <strong>Milling Date:</strong> <span id="journey-milling-date">-</span><br>
+                                    <strong>Quality:</strong> <span id="journey-quality">-</span><br>
+                                    <strong>Moisture:</strong> <span id="journey-moisture">-</span>
+                                </p>
+                            </div>
+
+                            <!-- Connector Line -->
+                            <div style="position: absolute; left: -1.5rem; top: 6rem; width: 2px; height: 2rem; background: #ddd;"></div>
+
+                            <!-- Market Stage -->
+                            <div style="position: relative;">
+                                <div style="position: absolute; left: -2rem; top: 0; width: 1rem; height: 1rem; background: #0d9488; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 2px #0d9488;"></div>
+                                <h6 style="margin: 0 0 0.5rem 0; color: #0d9488;"><i class="fas fa-store me-1"></i>Market</h6>
+                                <p style="margin: 0; font-size: 0.9rem; color: #666;">
+                                    <strong>Status:</strong> <span id="journey-status">-</span><br>
+                                    <strong>Price/KG:</strong> <span id="journey-price">-</span><br>
+                                    <strong>Last Updated:</strong> <span id="journey-updated">-</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key Metrics -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border-left: 4px solid #22c55e;">
+                            <p style="margin: 0; font-size: 0.8rem; color: #666; text-transform: uppercase;">Batch ID</p>
+                            <p style="margin: 0.5rem 0 0 0; font-size: 1.2rem; font-weight: 600; color: #008540;" id="journey-batch-id">-</p>
+                        </div>
+                        <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border-left: 4px solid #22c55e;">
+                            <p style="margin: 0; font-size: 0.8rem; color: #666; text-transform: uppercase;">Total Weight</p>
+                            <p style="margin: 0.5rem 0 0 0; font-size: 1.2rem; font-weight: 600; color: #008540;" id="journey-weight">-</p>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <button class="btn btn-outline-secondary" onclick="resetScan()" style="border-radius: 8px;">
+                            <i class="fas fa-redo me-2"></i>Scan Again
+                        </button>
+                        <button class="btn btn-primary" onclick="viewBatchDetails()" style="border-radius: 8px; background: #008540; border: none;">
+                            <i class="fas fa-external-link-alt me-2"></i>Full Details
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Scans -->
+                <div class="mt-4">
+                    <h6><i class="fas fa-history me-2"></i>Recent Scans</h6>
+                    <div class="list-group" id="recent-scans-list">
+                        <p class="text-muted small">No scans yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
         <div id="toast" class="toast" role="alert">
@@ -989,6 +1128,9 @@
             </div>
         </div>
     </div>
+
+    </div>
+    <!-- End app-container -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.7.7/dist/axios.min.js"></script>
