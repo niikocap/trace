@@ -231,9 +231,7 @@ router.post('/', async (req, res) => {
             transaction_date: new Date().toISOString(),
             status: statusValue,
             moisture: parseInt(moisture || '0'),
-            is_test: 1 // is_test !== undefined ? Number(is_test) : (req.hostname === 'localhost' || req.hostname === '127.0.0.1' ? 1 : 0)
-            // Note: nonce is omitted to use auto-incrementing nonce (starts at 100000, increments by 1)
-            // If you need to override, add: nonce: nonce !== undefined ? nonce : undefined
+            is_test: is_test !== undefined ? Number(is_test) : (req.hostname === 'localhost' || req.hostname === '127.0.0.1' ? 1 : 0)
         };
         
         // Create real blockchain transaction
@@ -373,9 +371,7 @@ router.post('/:id', async (req, res) => {
             transaction_date: new Date().toISOString(),
             status: statusValue,
             moisture: parseInt(moisture || '0'),
-            is_test: 1 // is_test !== undefined ? Number(is_test) : (req.hostname === 'localhost' || req.hostname === '127.0.0.1' ? 1 : 0)
-            // Note: nonce is omitted to use auto-incrementing nonce (starts at 100000, increments by 1)
-            // If you need to override, add: nonce: nonce !== undefined ? nonce : undefined
+            is_test: is_test !== undefined ? Number(is_test) : (req.hostname === 'localhost' || req.hostname === '127.0.0.1' ? 1 : 0)
         };
         
         // Create real blockchain transaction
