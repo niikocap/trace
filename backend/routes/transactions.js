@@ -499,18 +499,18 @@ function transformTransactionPayload(payload) {
         public_key: payload.public_key || null
     };
 
-    // Handle batch_id - keep as single number, not array
+    // Handle batch_id - keep as array for external API (required|array)
     if (payload.batch_id) {
         if (Array.isArray(payload.batch_id)) {
-            transformed.batch_id = payload.batch_id.length > 0 ? parseInt(payload.batch_id[0]) : null;
-        } else if (payload.batch_id) {
-            transformed.batch_id = parseInt(payload.batch_id);
+            transformed.batch_id = payload.batch_id.map(id => parseInt(id));
+        } else {
+            transformed.batch_id = [parseInt(payload.batch_id)];
         }
     } else if (payload.batch_ids) {
         if (Array.isArray(payload.batch_ids)) {
-            transformed.batch_id = payload.batch_ids.length > 0 ? parseInt(payload.batch_ids[0]) : null;
-        } else if (payload.batch_ids) {
-            transformed.batch_id = parseInt(payload.batch_ids);
+            transformed.batch_id = payload.batch_ids.map(id => parseInt(id));
+        } else {
+            transformed.batch_id = [parseInt(payload.batch_ids)];
         }
     }
 
@@ -523,13 +523,6 @@ function transformTransactionPayload(payload) {
                 reference_number: payload.payment_reference.reference_number || null,
                 amount: payload.payment_reference.amount !== undefined ? parseFloat(payload.payment_reference.amount) : null
             };
-            
-            // Add deduction if present in payment_reference object
-            if (payload.payment_reference.deduction !== undefined && payload.payment_reference.deduction !== null) {
-                transformed.payment_reference.deduction = parseFloat(payload.payment_reference.deduction);
-            } else if (transformed.deduction && transformed.deduction !== 0) {
-                transformed.payment_reference.deduction = transformed.deduction;
-            }
         } else {
             // Numeric format - convert to object
             const methodMap = { 0: 'cash', 1: 'cheque', 2: 'balance' };
@@ -538,11 +531,6 @@ function transformTransactionPayload(payload) {
             transformed.payment_reference = {
                 method: method
             };
-            
-            // Add deduction if present
-            if (transformed.deduction && transformed.deduction !== 0) {
-                transformed.payment_reference.deduction = transformed.deduction;
-            }
         }
     } else {
         // Default to cash if not provided
@@ -551,9 +539,12 @@ function transformTransactionPayload(payload) {
         };
     }
     
-    // Remove null/undefined fields to avoid external API validation issues
+    // Remove null/undefined fields and deduction to avoid external API validation issues
     const cleaned = {};
     for (const [key, value] of Object.entries(transformed)) {
+        // Skip deduction field for external API
+        if (key === 'deduction') continue;
+        
         if (value !== null && value !== undefined) {
             cleaned[key] = value;
         }
