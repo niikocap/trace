@@ -218,16 +218,19 @@ class SolanaService {
                 });
             } catch (sendError) {
                 console.error('[TX] SendTransactionError:', sendError.message);
+                console.error('[TX] Transaction message:', sendError.transactionMessage);
+                
+                // Log instruction data for debugging
+                console.error('[TX] Instruction data length:', instructionData.length);
+                console.error('[TX] Instruction data (hex):', instructionData.toString('hex'));
+                console.error('[TX] Account keys:', ix.keys.map(k => ({
+                    pubkey: k.pubkey.toString(),
+                    isSigner: k.isSigner,
+                    isWritable: k.isWritable
+                })));
+                
                 if (sendError.logs) {
                     console.error('[TX] Transaction logs:', sendError.logs);
-                }
-                if (typeof sendError.getLogs === 'function') {
-                    try {
-                        const logs = sendError.getLogs();
-                        console.error('[TX] Detailed logs:', logs);
-                    } catch (logError) {
-                        console.error('[TX] Could not get logs:', logError.message);
-                    }
                 }
                 throw sendError;
             }
