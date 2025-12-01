@@ -21,6 +21,7 @@ class SolanaService {
         this.lastRequestTime = 0;
         this.requestQueue = [];
         this.isProcessingQueue = false;
+        this.currentNonce = 100000; // Start nonce at 100000, auto-increment each transaction
     }
 
     // Queue requests to prevent concurrent rate limiting
@@ -138,9 +139,14 @@ class SolanaService {
             if (process.env.SOLANA_PRIVATE_KEY) {
                 try {
                     console.log('[TX] Using SOLANA_PRIVATE_KEY from environment');
+                    console.log('[TX] SOLANA_PRIVATE_KEY value (first 50 chars):', process.env.SOLANA_PRIVATE_KEY.substring(0, 50));
                     const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
+                    console.log('[TX] Parsed private key type:', typeof privateKeyArray, 'is array:', Array.isArray(privateKeyArray));
+                    if (Array.isArray(privateKeyArray)) {
+                        console.log('[TX] Private key array length:', privateKeyArray.length);
+                    }
                     if (!Array.isArray(privateKeyArray) || privateKeyArray.length !== 64) {
-                        throw new Error(`Invalid private key format. Expected array of 64 numbers, got ${privateKeyArray.length} elements`);
+                        throw new Error(`Invalid private key format. Expected array of 64 numbers, got ${Array.isArray(privateKeyArray) ? privateKeyArray.length : 'not an array'} elements. SOLANA_PRIVATE_KEY must be a JSON array of 64 numbers from ~/.config/solana/id.json`);
                     }
                     walletKeypair = Keypair.fromSecretKey(Uint8Array.from(privateKeyArray));
                     console.log('[TX] Wallet keypair loaded from SOLANA_PRIVATE_KEY');
@@ -166,8 +172,15 @@ class SolanaService {
             }
             console.log('[TX] Wallet loaded successfully:', walletKeypair.publicKey.toString());
 
-            // Get nonce from transaction data
-            const nonce = transactionData.nonce || 0;
+            // Get nonce from transaction data, or use auto-incrementing nonce
+            let nonce = transactionData.nonce;
+            if (nonce === undefined || nonce === null) {
+                nonce = this.currentNonce;
+                this.currentNonce++;
+                console.log(`[TX] Auto-assigned nonce: ${nonce}, next will be: ${this.currentNonce}`);
+            } else {
+                console.log(`[TX] Using provided nonce: ${nonce}`);
+            }
 
             // Derive PDA for the transaction account
             const { pda: transactionPda, bump } = await this.getTransactionPDA(walletKeypair.publicKey, nonce);
