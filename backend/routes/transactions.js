@@ -220,9 +220,8 @@ router.post('/', async (req, res) => {
         }
         
         // Create blockchain transaction data
-        const isTestValue = is_test !== undefined && is_test !== null && is_test !== '' ? Number(is_test) : (req.hostname === 'localhost' || req.hostname === '127.0.0.1' ? 1 : 0);
+        const isTestValue = is_test !== undefined && is_test !== null && is_test !== '' ? Number(is_test) : 0;
         console.log(`[TX] is_test from request: ${is_test}, type: ${typeof is_test}, final is_test: ${isTestValue}`);
-        console.log(`[TX] hostname: ${req.hostname}`);
         
         const transactionData = {
             from_actor_id: parseInt(from_actor_id),
@@ -364,9 +363,8 @@ router.post('/:id', async (req, res) => {
         }
         
         // Create blockchain transaction data
-        const isTestValue = is_test !== undefined && is_test !== null && is_test !== '' ? Number(is_test) : (req.hostname === 'localhost' || req.hostname === '127.0.0.1' ? 1 : 0);
+        const isTestValue = is_test !== undefined && is_test !== null && is_test !== '' ? Number(is_test) : 0;
         console.log(`[TX] is_test from request: ${is_test}, type: ${typeof is_test}, final is_test: ${isTestValue}`);
-        console.log(`[TX] hostname: ${req.hostname}`);
         
         const transactionData = {
             from_actor_id: parseInt(from_actor_id),
