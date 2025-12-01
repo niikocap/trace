@@ -131,26 +131,40 @@ class SolanaService {
             // Load wallet keypair from environment variable or local file
             let walletKeypair;
 
+            console.log('[TX] Loading wallet keypair...');
+            console.log('[TX] SOLANA_PRIVATE_KEY env var set:', !!process.env.SOLANA_PRIVATE_KEY);
+            console.log('[TX] HOME env var:', process.env.HOME);
+
             if (process.env.SOLANA_PRIVATE_KEY) {
                 try {
+                    console.log('[TX] Using SOLANA_PRIVATE_KEY from environment');
                     const privateKeyArray = JSON.parse(process.env.SOLANA_PRIVATE_KEY);
                     if (!Array.isArray(privateKeyArray) || privateKeyArray.length !== 64) {
                         throw new Error(`Invalid private key format. Expected array of 64 numbers, got ${privateKeyArray.length} elements`);
                     }
                     walletKeypair = Keypair.fromSecretKey(Uint8Array.from(privateKeyArray));
+                    console.log('[TX] Wallet keypair loaded from SOLANA_PRIVATE_KEY');
                 } catch (parseError) {
                     throw new Error(`Failed to parse SOLANA_PRIVATE_KEY: ${parseError.message}`);
                 }
             } else {
                 const walletPath = path.join(process.env.HOME || '/tmp', '.config/solana/id.json');
+                console.log('[TX] Checking wallet file at:', walletPath);
                 if (fs.existsSync(walletPath)) {
+                    console.log('[TX] Found wallet file, loading...');
                     walletKeypair = Keypair.fromSecretKey(
                         Uint8Array.from(JSON.parse(fs.readFileSync(walletPath, 'utf8')))
                     );
+                    console.log('[TX] Wallet keypair loaded from file');
                 } else {
-                    throw new Error('No wallet keypair found. Set SOLANA_PRIVATE_KEY environment variable or ensure ~/.config/solana/id.json exists');
+                    throw new Error(`No wallet keypair found. Checked: ${walletPath}. Set SOLANA_PRIVATE_KEY environment variable or ensure ~/.config/solana/id.json exists`);
                 }
             }
+
+            if (!walletKeypair) {
+                throw new Error('Failed to load wallet keypair - walletKeypair is null');
+            }
+            console.log('[TX] Wallet loaded successfully:', walletKeypair.publicKey.toString());
 
             // Get nonce from transaction data
             const nonce = transactionData.nonce || 0;
