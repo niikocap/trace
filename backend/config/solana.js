@@ -151,6 +151,9 @@ class SolanaService {
             const transactionPda = transactionKeypair.publicKey;
             console.log(`[TX] Generated transaction account: ${transactionPda.toString()}`);
 
+            // Get nonce from transaction data
+            const nonce = transactionData.nonce || 0;
+
             // Hash full JSON payload for data_hash
             const jsonData = JSON.stringify(transactionData);
             const hash = require('crypto').createHash('sha256').update(jsonData).digest();
