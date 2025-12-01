@@ -3,8 +3,7 @@
 // Configuration
 // Dynamic API base URL that works for both local development and deployed environments
 const API_BASE_URL = `${window.location.protocol}//${window.location.host}/api`;
-  const API_EXTERNAL_URL = "https://digisaka.app";
-  // const API_EXTERNAL_URL = "https://digisaka.app";
+const API_EXTERNAL_URL = "https://digisaka.app";
 
 // Global variables
 let currentSection = 'dashboard';
@@ -23,7 +22,7 @@ let transactionsPaginationState = {
         moistureMin: 0,
         moistureMax: 100,
         quantityMin: 0,
-        quantityMax: 10000
+        quantityMax: 999999999  // Large default to not filter out valid transactions
     }
 };
 
@@ -632,14 +631,23 @@ async function loadRiceBatches(page = 1) {
 async function loadChainTransactions() {
     try {
         showTableLoading('transactions-tbody');
+        console.log('Fetching transactions from:', getApiUrl('/transactions'));
+        
         const response = await fetchData('/transactions');
+        console.log('API Response:', response);
+        
         transactionsPaginationState.allData = response.data || [];
-
         console.log('Loaded transactions:', transactionsPaginationState.allData.length);
+        console.log('All data:', transactionsPaginationState.allData);
 
         // Enrich transaction data with actor names
-        const actorsResponse = await fetchData('/chain-actors');
-        const actors = actorsResponse.data || [];
+        let actors = [];
+        try {
+            const actorsResponse = await fetchData('/chain-actors');
+            actors = actorsResponse.data || [];
+        } catch (e) {
+            console.warn('Failed to load actors:', e);
+        }
 
         // Create actor lookup map
         const actorMap = {};
@@ -656,6 +664,8 @@ async function loadChainTransactions() {
         // Initialize filters and pagination
         transactionsPaginationState.currentPage = 1;
         applyTransactionFilters();
+        console.log('After filtering:', transactionsPaginationState.filteredData.length, transactionsPaginationState.filteredData);
+        
         renderTransactionFilters();
         renderTransactionPagination();
         renderChainTransactionsTable();
@@ -666,8 +676,9 @@ async function loadChainTransactions() {
         setupTransactionHeaderControls();
     } catch (error) {
         console.error('Error loading chain transactions:', error);
-        showToast('Error loading chain transactions', 'error');
-        showTableError('transactions-tbody', 'Error loading chain transactions');
+        console.error('Error details:', error.message, error.stack);
+        showToast('Error loading chain transactions: ' + error.message, 'error');
+        showTableError('transactions-tbody', 'Error loading chain transactions: ' + error.message);
     }
 }
 
@@ -3326,8 +3337,19 @@ function getApiUrl(endpoint) {
 
 async function fetchData(endpoint) {
     const url = getApiUrl(endpoint);
-    const response = await fetch(url);
-    return await response.json();
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.error(`API Error: ${response.status} ${response.statusText} for ${url}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const data = await response.json();
+        console.log(`Fetched from ${url}:`, data);
+        return data;
+    } catch (error) {
+        console.error(`Failed to fetch ${url}:`, error);
+        throw error;
+    }
 }
 
 async function createData(endpoint, data) {
