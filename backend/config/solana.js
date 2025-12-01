@@ -208,12 +208,29 @@ class SolanaService {
             // Sign the transaction
             transaction.sign(walletKeypair);
 
-            const signature = await this.queueRequest(async () => {
-                return await this.connection.sendTransaction(transaction, [walletKeypair], {
-                    commitment: 'confirmed',
-                    preflightCommitment: 'confirmed',
+            let signature;
+            try {
+                signature = await this.queueRequest(async () => {
+                    return await this.connection.sendTransaction(transaction, [walletKeypair], {
+                        commitment: 'confirmed',
+                        preflightCommitment: 'confirmed',
+                    });
                 });
-            });
+            } catch (sendError) {
+                console.error('[TX] SendTransactionError:', sendError.message);
+                if (sendError.logs) {
+                    console.error('[TX] Transaction logs:', sendError.logs);
+                }
+                if (typeof sendError.getLogs === 'function') {
+                    try {
+                        const logs = sendError.getLogs();
+                        console.error('[TX] Detailed logs:', logs);
+                    } catch (logError) {
+                        console.error('[TX] Could not get logs:', logError.message);
+                    }
+                }
+                throw sendError;
+            }
 
             await this.queueRequest(async () => {
                 return await this.connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
