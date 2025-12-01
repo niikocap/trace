@@ -434,31 +434,51 @@ router.get('/health', async (req, res) => {
 // Helper function to transform transaction payload for external API
 function transformTransactionPayload(payload) {
     // Create payload matching external API structure
+    // The external API expects: from_actor_id, to_actor_id, batch_id (single number), 
+    // price_per_kg, moisture, payment_reference, status, and optional fields
     const transformed = {
+        from_actor_id: payload.from_actor_id ? parseInt(payload.from_actor_id) : null,
+        to_actor_id: payload.to_actor_id ? parseInt(payload.to_actor_id) : null,
         batch_id: null,
-        from_actor_id: payload.from_actor_id || null,
-        to_actor_id: payload.to_actor_id || null,
         price_per_kg: payload.price_per_kg ? parseFloat(payload.price_per_kg) : null,
         moisture: payload.moisture ? parseFloat(payload.moisture) : null,
+        payment_reference: payload.payment_reference !== undefined ? parseInt(payload.payment_reference) : null,
+        status: payload.status || null,
         quality: payload.quality || null,
-        payment_reference: payload.payment_reference ? parseInt(payload.payment_reference) : null,
         payment_method: payload.payment_method || null,
         deduction: payload.deduction !== undefined && payload.deduction !== null ? parseFloat(payload.deduction) : 0,
-        status: payload.status || null,
         agree_seller: payload.agree_seller || null,
         agree_buyer: payload.agree_buyer || null,
         geotagging: payload.geotagging || null
     };
 
-    // Handle batch_id - convert to array if needed
+    // Handle batch_id - keep as single number, not array
     if (payload.batch_id) {
         transformed.batch_id = Array.isArray(payload.batch_id) 
-            ? payload.batch_id.map(id => parseInt(id))
-            : [parseInt(payload.batch_id)];
+            ? parseInt(payload.batch_id[0])
+            : parseInt(payload.batch_id);
     } else if (payload.batch_ids) {
         transformed.batch_id = Array.isArray(payload.batch_ids) 
-            ? payload.batch_ids.map(id => parseInt(id))
-            : [parseInt(payload.batch_ids)];
+            ? parseInt(payload.batch_ids[0])
+            : parseInt(payload.batch_ids);
+    }
+
+    // Convert payment_reference to object with method and optional deduction
+    if (transformed.payment_reference !== null && transformed.payment_reference !== undefined) {
+        const methodMap = { 0: 'cash', 1: 'cheque', 2: 'balance' };
+        const method = methodMap[transformed.payment_reference] || 'cash';
+        
+        transformed.payment_reference = {
+            method: method
+        };
+        
+        // Only add deduction if it's not null and not 0
+        if (transformed.deduction && transformed.deduction !== 0) {
+            transformed.payment_reference.deduction = transformed.deduction;
+        }
+        
+        // Remove deduction from top level since it's now in payment_reference
+        delete transformed.deduction;
     }
 
     return transformed;

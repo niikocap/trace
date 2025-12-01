@@ -209,7 +209,7 @@ class SolanaService {
             transaction.sign(walletKeypair);
 
             const signature = await this.queueRequest(async () => {
-                return await this.connection.sendTransaction(transaction, [], {
+                return await this.connection.sendTransaction(transaction, [walletKeypair], {
                     commitment: 'confirmed',
                     preflightCommitment: 'confirmed',
                 });
