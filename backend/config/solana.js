@@ -44,8 +44,8 @@ class SolanaService {
         } catch (error) {
             console.warn(`[NONCE] Failed to load nonce from file: ${error.message}`);
         }
-        console.log(`[NONCE] Initializing nonce to 100000`);
-        return 100000;
+        console.log(`[NONCE] Initializing nonce to 100005`);
+        return 100005;
     }
 
     // Save nonce to file
