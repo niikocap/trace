@@ -175,7 +175,8 @@ class SolanaService {
             instructionData = Buffer.concat([instructionData, this.serializeU8(transactionData.status || 0)]);
             instructionData = Buffer.concat([instructionData, this.serializeU8(transactionData.is_test || 0)]);
 
-            // Create instruction
+            // Create instruction with correct account order matching Anchor program
+            // Order: transaction (writable), authority (signer, writable), system_program (readonly)
             const ix = new TransactionInstruction({
                 programId: this.programId,
                 keys: [
@@ -201,6 +202,9 @@ class SolanaService {
             });
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = walletKeypair.publicKey;
+            
+            // Sign the transaction
+            transaction.sign(walletKeypair);
 
             const signature = await this.queueRequest(async () => {
                 return await this.connection.sendTransaction(transaction, [walletKeypair], {
