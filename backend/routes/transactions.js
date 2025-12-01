@@ -167,10 +167,23 @@ router.post('/', async (req, res) => {
         // Convert payment_reference to numeric value
         let paymentRefValue = 0; // default to cash
         if (payment_reference) {
-            if (payment_reference === 'cheque' || payment_reference === '1') {
-                paymentRefValue = 1;
-            } else if (payment_reference === 'balance' || payment_reference === '2') {
-                paymentRefValue = 2;
+            if (typeof payment_reference === 'object') {
+                // Object format - extract method
+                const method = payment_reference.method || 'cash';
+                if (method === 'cheque' || method === '1') {
+                    paymentRefValue = 1;
+                } else if (method === 'balance' || method === '2') {
+                    paymentRefValue = 2;
+                } else {
+                    paymentRefValue = 0; // cash
+                }
+            } else {
+                // Numeric or string format
+                if (payment_reference === 'cheque' || payment_reference === '1') {
+                    paymentRefValue = 1;
+                } else if (payment_reference === 'balance' || payment_reference === '2') {
+                    paymentRefValue = 2;
+                }
             }
         }
         
@@ -285,10 +298,23 @@ router.post('/:id', async (req, res) => {
         // Convert payment_reference to numeric value
         let paymentRefValue = 0; // default to cash
         if (payment_reference) {
-            if (payment_reference === 'cheque' || payment_reference === '1') {
-                paymentRefValue = 1;
-            } else if (payment_reference === 'balance' || payment_reference === '2') {
-                paymentRefValue = 2;
+            if (typeof payment_reference === 'object') {
+                // Object format - extract method
+                const method = payment_reference.method || 'cash';
+                if (method === 'cheque' || method === '1') {
+                    paymentRefValue = 1;
+                } else if (method === 'balance' || method === '2') {
+                    paymentRefValue = 2;
+                } else {
+                    paymentRefValue = 0; // cash
+                }
+            } else {
+                // Numeric or string format
+                if (payment_reference === 'cheque' || payment_reference === '1') {
+                    paymentRefValue = 1;
+                } else if (payment_reference === 'balance' || payment_reference === '2') {
+                    paymentRefValue = 2;
+                }
             }
         }
         
@@ -442,14 +468,15 @@ function transformTransactionPayload(payload) {
         batch_id: null,
         price_per_kg: payload.price_per_kg ? parseFloat(payload.price_per_kg) : null,
         moisture: payload.moisture ? parseFloat(payload.moisture) : null,
-        payment_reference: payload.payment_reference !== undefined ? parseInt(payload.payment_reference) : null,
+        payment_reference: null,
         status: payload.status || null,
         quality: payload.quality || null,
         payment_method: payload.payment_method || null,
         deduction: payload.deduction !== undefined && payload.deduction !== null ? parseFloat(payload.deduction) : 0,
-        agree_seller: payload.agree_seller || null,
-        agree_buyer: payload.agree_buyer || null,
-        geotagging: payload.geotagging || null
+        agree_seller: payload.agree_seller !== undefined ? payload.agree_seller : null,
+        agree_buyer: payload.agree_buyer !== undefined ? payload.agree_buyer : null,
+        geotagging: payload.geotagging || null,
+        public_key: payload.public_key || null
     };
 
     // Handle batch_id - keep as single number, not array
@@ -463,23 +490,45 @@ function transformTransactionPayload(payload) {
             : parseInt(payload.batch_ids);
     }
 
-    // Convert payment_reference to object with method and optional deduction
-    if (transformed.payment_reference !== null && transformed.payment_reference !== undefined) {
-        const methodMap = { 0: 'cash', 1: 'cheque', 2: 'balance' };
-        const method = methodMap[transformed.payment_reference] || 'cash';
-        
-        transformed.payment_reference = {
-            method: method
-        };
-        
-        // Only add deduction if it's not null and not 0
-        if (transformed.deduction && transformed.deduction !== 0) {
-            transformed.payment_reference.deduction = transformed.deduction;
+    // Handle payment_reference - can be numeric or object
+    if (payload.payment_reference) {
+        if (typeof payload.payment_reference === 'object') {
+            // Already an object with method, reference_number, amount, etc.
+            transformed.payment_reference = {
+                method: payload.payment_reference.method || 'cash',
+                reference_number: payload.payment_reference.reference_number || null,
+                amount: payload.payment_reference.amount !== undefined ? parseFloat(payload.payment_reference.amount) : null
+            };
+            
+            // Add deduction if present in payment_reference object
+            if (payload.payment_reference.deduction !== undefined && payload.payment_reference.deduction !== null) {
+                transformed.payment_reference.deduction = parseFloat(payload.payment_reference.deduction);
+            } else if (transformed.deduction && transformed.deduction !== 0) {
+                transformed.payment_reference.deduction = transformed.deduction;
+            }
+        } else {
+            // Numeric format - convert to object
+            const methodMap = { 0: 'cash', 1: 'cheque', 2: 'balance' };
+            const method = methodMap[parseInt(payload.payment_reference)] || 'cash';
+            
+            transformed.payment_reference = {
+                method: method
+            };
+            
+            // Add deduction if present
+            if (transformed.deduction && transformed.deduction !== 0) {
+                transformed.payment_reference.deduction = transformed.deduction;
+            }
         }
-        
-        // Remove deduction from top level since it's now in payment_reference
-        delete transformed.deduction;
+    } else {
+        // Default to cash if not provided
+        transformed.payment_reference = {
+            method: 'cash'
+        };
     }
+    
+    // Remove deduction from top level since it's now in payment_reference
+    delete transformed.deduction;
 
     return transformed;
 }
