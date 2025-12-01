@@ -157,6 +157,9 @@ class SolanaService {
 
             // Derive PDA for the transaction account
             const { pda: transactionPda, bump } = await this.getTransactionPDA(walletKeypair.publicKey, nonce);
+            console.log(`[TX] Wallet: ${walletKeypair.publicKey.toString()}`);
+            console.log(`[TX] Nonce: ${nonce}`);
+            console.log(`[TX] Program ID: ${this.programId.toString()}`);
             console.log(`[TX] Derived transaction PDA: ${transactionPda.toString()} (bump: ${bump})`);
 
             // Hash full JSON payload for data_hash
@@ -196,6 +199,14 @@ class SolanaService {
                 ],
                 data: instructionData,
             });
+
+            console.log(`[TX] Account keys:`, ix.keys.map(k => ({
+                pubkey: k.pubkey.toString(),
+                isSigner: k.isSigner,
+                isWritable: k.isWritable
+            })));
+            console.log(`[TX] Instruction data length: ${instructionData.length}`);
+            console.log(`[TX] Instruction data (hex): ${instructionData.toString('hex')}`);
 
             // Memo instruction with full JSON
             const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
