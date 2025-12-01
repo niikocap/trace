@@ -21,7 +21,36 @@ class SolanaService {
         this.lastRequestTime = 0;
         this.requestQueue = [];
         this.isProcessingQueue = false;
-        this.currentNonce = 100000; // Start nonce at 100000, auto-increment each transaction
+        this.nonceFile = path.join(process.env.HOME || '/tmp', '.solana_nonce');
+        this.currentNonce = this.loadNonce(); // Load persisted nonce or start at 100000
+    }
+
+    // Load nonce from file, or initialize to 100000
+    loadNonce() {
+        try {
+            if (fs.existsSync(this.nonceFile)) {
+                const data = fs.readFileSync(this.nonceFile, 'utf8');
+                const nonce = parseInt(data.trim());
+                if (!isNaN(nonce)) {
+                    console.log(`[NONCE] Loaded persisted nonce: ${nonce}`);
+                    return nonce;
+                }
+            }
+        } catch (error) {
+            console.warn(`[NONCE] Failed to load nonce from file: ${error.message}`);
+        }
+        console.log(`[NONCE] Initializing nonce to 100000`);
+        return 100000;
+    }
+
+    // Save nonce to file
+    saveNonce(nonce) {
+        try {
+            fs.writeFileSync(this.nonceFile, nonce.toString(), 'utf8');
+            console.log(`[NONCE] Persisted nonce: ${nonce}`);
+        } catch (error) {
+            console.error(`[NONCE] Failed to save nonce: ${error.message}`);
+        }
     }
 
     // Queue requests to prevent concurrent rate limiting
@@ -177,6 +206,7 @@ class SolanaService {
             if (nonce === undefined || nonce === null) {
                 nonce = this.currentNonce;
                 this.currentNonce++;
+                this.saveNonce(this.currentNonce); // Persist nonce to file
                 console.log(`[TX] Auto-assigned nonce: ${nonce}, next will be: ${this.currentNonce}`);
             } else {
                 console.log(`[TX] Using provided nonce: ${nonce}`);
