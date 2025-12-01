@@ -147,10 +147,12 @@ class SolanaService {
 
             // Derive PDA: seeds = ["tx", authority, nonce]
             const nonce = transactionData.nonce || 0;
-            const [transactionPda] = await PublicKey.findProgramAddress(
+            console.log(`[TX] Deriving PDA with nonce=${nonce}, authority=${walletKeypair.publicKey.toString()}`);
+            const [transactionPda, bump] = await PublicKey.findProgramAddress(
                 [Buffer.from('tx'), walletKeypair.publicKey.toBuffer(), Buffer.from([nonce])],
                 this.programId
             );
+            console.log(`[TX] Derived PDA: ${transactionPda.toString()}, bump: ${bump}`);
 
             // Hash full JSON payload for data_hash
             const jsonData = JSON.stringify(transactionData);
@@ -207,7 +209,7 @@ class SolanaService {
             transaction.sign(walletKeypair);
 
             const signature = await this.queueRequest(async () => {
-                return await this.connection.sendTransaction(transaction, [walletKeypair], {
+                return await this.connection.sendTransaction(transaction, [], {
                     commitment: 'confirmed',
                     preflightCommitment: 'confirmed',
                 });
@@ -224,6 +226,9 @@ class SolanaService {
             };
         } catch (error) {
             console.error('Error creating real transaction:', error);
+            if (error.logs) {
+                console.error('[TX] Program logs:', error.logs);
+            }
             throw error;
         }
     }
