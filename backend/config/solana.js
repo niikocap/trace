@@ -145,14 +145,11 @@ class SolanaService {
                 }
             }
 
-            // Derive PDA: seeds = ["tx", authority, nonce]
-            const nonce = transactionData.nonce || 0;
-            console.log(`[TX] Deriving PDA with nonce=${nonce}, authority=${walletKeypair.publicKey.toString()}`);
-            const [transactionPda, bump] = await PublicKey.findProgramAddress(
-                [Buffer.from('tx'), walletKeypair.publicKey.toBuffer(), Buffer.from([nonce])],
-                this.programId
-            );
-            console.log(`[TX] Derived PDA: ${transactionPda.toString()}, bump: ${bump}`);
+            // Generate a keypair for the transaction account
+            // (PDAs cannot sign, so we use a regular keypair instead)
+            const transactionKeypair = Keypair.generate();
+            const transactionPda = transactionKeypair.publicKey;
+            console.log(`[TX] Generated transaction account: ${transactionPda.toString()}`);
 
             // Hash full JSON payload for data_hash
             const jsonData = JSON.stringify(transactionData);
@@ -234,13 +231,14 @@ class SolanaService {
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = walletKeypair.publicKey;
             
-            // Sign the transaction
-            transaction.sign(walletKeypair);
+            // Sign the transaction with both keypairs
+            // (wallet pays for transaction, transaction account is signer for createAccount)
+            transaction.sign(walletKeypair, transactionKeypair);
 
             let signature;
             try {
                 signature = await this.queueRequest(async () => {
-                    return await this.connection.sendTransaction(transaction, [walletKeypair], {
+                    return await this.connection.sendTransaction(transaction, [walletKeypair, transactionKeypair], {
                         commitment: 'confirmed',
                         preflightCommitment: 'confirmed',
                     });
