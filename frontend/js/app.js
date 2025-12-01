@@ -3298,7 +3298,7 @@ function getEntityFields(entityType) {
             },
             { name: 'agree_seller', label: '', type: 'hidden', required: false, defaultValue: '1' },
             { name: 'agree_buyer', label: '', type: 'hidden', required: false, defaultValue: '1' },
-            { name: 'is_test', label: '', type: 'hidden', required: false, defaultValue: '1' }
+            { name: 'is_test', label: '', type: 'hidden', required: false, defaultValue: '0' }
         ],
         'drying_data': [
             { name: 'initial_mc', label: 'Initial Moisture Content (%)', type: 'number', required: false, step: '0.01', placeholder: 'e.g., 20.00' },
