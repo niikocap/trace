@@ -28,13 +28,18 @@ class SolanaService {
     // Load nonce from file, or initialize to 100000
     loadNonce() {
         try {
+            console.log(`[NONCE] Checking nonce file at: ${this.nonceFile}`);
             if (fs.existsSync(this.nonceFile)) {
                 const data = fs.readFileSync(this.nonceFile, 'utf8');
+                console.log(`[NONCE] File contents: "${data}"`);
                 const nonce = parseInt(data.trim());
-                if (!isNaN(nonce)) {
+                console.log(`[NONCE] Parsed nonce: ${nonce}, isNaN: ${isNaN(nonce)}`);
+                if (!isNaN(nonce) && nonce > 0) {
                     console.log(`[NONCE] Loaded persisted nonce: ${nonce}`);
                     return nonce;
                 }
+            } else {
+                console.log(`[NONCE] Nonce file does not exist`);
             }
         } catch (error) {
             console.warn(`[NONCE] Failed to load nonce from file: ${error.message}`);
@@ -205,9 +210,11 @@ class SolanaService {
             let nonce = transactionData.nonce;
             if (nonce === undefined || nonce === null) {
                 nonce = this.currentNonce;
+                console.log(`[TX] Auto-assigned nonce: ${nonce}`);
+                // Increment and persist IMMEDIATELY before using
                 this.currentNonce++;
-                this.saveNonce(this.currentNonce); // Persist nonce to file
-                console.log(`[TX] Auto-assigned nonce: ${nonce}, next will be: ${this.currentNonce}`);
+                this.saveNonce(this.currentNonce);
+                console.log(`[TX] Next nonce will be: ${this.currentNonce}`);
             } else {
                 console.log(`[TX] Using provided nonce: ${nonce}`);
             }
