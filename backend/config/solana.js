@@ -114,9 +114,16 @@ class SolanaService {
         }
     }
 
-    async getTransactionPDA() {
-        // Generate a random keypair for the transaction account
-        return Keypair.generate();
+    async getTransactionPDA(walletPublicKey, nonce) {
+        // Derive PDA from seeds: [b"tx", authority.key(), nonce]
+        const seeds = [
+            Buffer.from('tx'),
+            walletPublicKey.toBuffer(),
+            Buffer.from([nonce])
+        ];
+        
+        const [pda, bump] = await PublicKey.findProgramAddress(seeds, this.programId);
+        return { pda, bump };
     }
     
     async createRealTransaction(transactionData) {
@@ -145,14 +152,12 @@ class SolanaService {
                 }
             }
 
-            // Generate a keypair for the transaction account
-            // (PDAs cannot sign, so we use a regular keypair instead)
-            const transactionKeypair = Keypair.generate();
-            const transactionPda = transactionKeypair.publicKey;
-            console.log(`[TX] Generated transaction account: ${transactionPda.toString()}`);
-
             // Get nonce from transaction data
             const nonce = transactionData.nonce || 0;
+
+            // Derive PDA for the transaction account
+            const { pda: transactionPda, bump } = await this.getTransactionPDA(walletKeypair.publicKey, nonce);
+            console.log(`[TX] Derived transaction PDA: ${transactionPda.toString()} (bump: ${bump})`);
 
             // Hash full JSON payload for data_hash
             const jsonData = JSON.stringify(transactionData);
@@ -180,12 +185,12 @@ class SolanaService {
             const transaction = new Transaction();
 
             // Create instruction with correct account order matching Anchor program
-            // Order: transaction (signer, writable), authority (signer, writable), system_program (readonly)
-            // Note: The program is responsible for creating the account if it doesn't exist
+            // Order: transaction (PDA, writable), authority (signer, writable), system_program (readonly)
+            // Note: PDA cannot be a signer, only the wallet (authority) signs
             const ix = new TransactionInstruction({
                 programId: this.programId,
                 keys: [
-                    { pubkey: transactionPda, isSigner: true, isWritable: true },
+                    { pubkey: transactionPda, isSigner: false, isWritable: true },
                     { pubkey: walletKeypair.publicKey, isSigner: true, isWritable: true },
                     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
                 ],
@@ -208,14 +213,14 @@ class SolanaService {
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = walletKeypair.publicKey;
             
-            // Sign the transaction with both keypairs
-            // (wallet pays for transaction, transaction account is signer for createAccount)
-            transaction.sign(walletKeypair, transactionKeypair);
+            // Sign the transaction with wallet keypair only
+            // (PDA cannot sign, only the wallet pays and signs)
+            transaction.sign(walletKeypair);
 
             let signature;
             try {
                 signature = await this.queueRequest(async () => {
-                    return await this.connection.sendTransaction(transaction, [walletKeypair, transactionKeypair], {
+                    return await this.connection.sendTransaction(transaction, [walletKeypair], {
                         commitment: 'confirmed',
                         preflightCommitment: 'confirmed',
                     });

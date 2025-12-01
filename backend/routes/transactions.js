@@ -482,6 +482,20 @@ function transformTransactionPayload(payload) {
     // Create payload matching external API structure
     // The external API expects: from_actor_id, to_actor_id, batch_id (single number), 
     // price_per_kg, moisture, payment_reference, status, and optional fields
+    // Convert status to string format for external API
+    let statusValue = null;
+    if (payload.status) {
+        if (payload.status === '0' || payload.status === 0) {
+            statusValue = 'cancelled';
+        } else if (payload.status === '1' || payload.status === 1 || payload.status === 'completed') {
+            statusValue = 'completed';
+        } else if (payload.status === '2' || payload.status === 2 || payload.status === 'pending') {
+            statusValue = 'pending';
+        } else {
+            statusValue = payload.status; // Pass through as-is if already a string
+        }
+    }
+
     const transformed = {
         from_actor_id: payload.from_actor_id ? parseInt(payload.from_actor_id) : null,
         to_actor_id: payload.to_actor_id ? parseInt(payload.to_actor_id) : null,
@@ -489,7 +503,7 @@ function transformTransactionPayload(payload) {
         price_per_kg: payload.price_per_kg ? parseFloat(payload.price_per_kg) : null,
         moisture: payload.moisture ? parseFloat(payload.moisture) : null,
         payment_reference: null,
-        status: payload.status || null,
+        status: statusValue,
         quality: payload.quality || null,
         payment_method: payload.payment_method || null,
         deduction: payload.deduction !== undefined && payload.deduction !== null ? parseFloat(payload.deduction) : 0,
