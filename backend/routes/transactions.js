@@ -146,6 +146,7 @@ router.post('/', async (req, res) => {
         }
         
         // Step 1: Forward to external API for upsert
+        console.log('Sending to external API:', JSON.stringify(externalPayload, null, 2));
         const externalData = await externalApi.post('/mobile/trace/transaction/upsert', externalPayload);
         
         console.log('External API response:', externalData);
@@ -286,6 +287,7 @@ router.post('/:id', async (req, res) => {
         }
         
         // Step 1: Forward to external API for upsert
+        console.log('Sending to external API:', JSON.stringify(externalPayload, null, 2));
         const externalData = await externalApi.post(`/mobile/trace/transaction/upsert/${id}`, externalPayload);
         
         console.log('External API response:', externalData);
@@ -499,13 +501,17 @@ function transformTransactionPayload(payload) {
 
     // Handle batch_id - keep as single number, not array
     if (payload.batch_id) {
-        transformed.batch_id = Array.isArray(payload.batch_id) 
-            ? parseInt(payload.batch_id[0])
-            : parseInt(payload.batch_id);
+        if (Array.isArray(payload.batch_id)) {
+            transformed.batch_id = payload.batch_id.length > 0 ? parseInt(payload.batch_id[0]) : null;
+        } else if (payload.batch_id) {
+            transformed.batch_id = parseInt(payload.batch_id);
+        }
     } else if (payload.batch_ids) {
-        transformed.batch_id = Array.isArray(payload.batch_ids) 
-            ? parseInt(payload.batch_ids[0])
-            : parseInt(payload.batch_ids);
+        if (Array.isArray(payload.batch_ids)) {
+            transformed.batch_id = payload.batch_ids.length > 0 ? parseInt(payload.batch_ids[0]) : null;
+        } else if (payload.batch_ids) {
+            transformed.batch_id = parseInt(payload.batch_ids);
+        }
     }
 
     // Handle payment_reference - can be numeric or object
@@ -545,10 +551,15 @@ function transformTransactionPayload(payload) {
         };
     }
     
-    // Remove deduction from top level since it's now in payment_reference
-    delete transformed.deduction;
+    // Remove null/undefined fields to avoid external API validation issues
+    const cleaned = {};
+    for (const [key, value] of Object.entries(transformed)) {
+        if (value !== null && value !== undefined) {
+            cleaned[key] = value;
+        }
+    }
 
-    return transformed;
+    return cleaned;
 }
 
 module.exports = router;
