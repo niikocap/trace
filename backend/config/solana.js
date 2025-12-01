@@ -207,11 +207,11 @@ class SolanaService {
             }
 
             // Create instruction with correct account order matching Anchor program
-            // Order: transaction (writable), authority (signer, writable), system_program (readonly)
+            // Order: transaction (signer, writable), authority (signer, writable), system_program (readonly)
             const ix = new TransactionInstruction({
                 programId: this.programId,
                 keys: [
-                    { pubkey: transactionPda, isSigner: false, isWritable: true },
+                    { pubkey: transactionPda, isSigner: true, isWritable: true },
                     { pubkey: walletKeypair.publicKey, isSigner: true, isWritable: true },
                     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
                 ],
