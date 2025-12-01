@@ -132,9 +132,18 @@ router.post('/', async (req, res) => {
         const payload = req.body;
 
         console.log('Creating transaction:', payload);
+        console.log('Input batch_id type:', typeof payload.batch_id, 'value:', payload.batch_id);
 
         // Transform payload for external API
-        const externalPayload = transformTransactionPayload(payload);
+        let externalPayload;
+        try {
+            externalPayload = transformTransactionPayload(payload);
+            console.log('Transformed payload for external API:', JSON.stringify(externalPayload, null, 2));
+            console.log('Transformed batch_id type:', typeof externalPayload.batch_id, 'value:', externalPayload.batch_id);
+        } catch (transformError) {
+            console.error('Error during transformation:', transformError);
+            throw transformError;
+        }
         
         // Step 1: Forward to external API for upsert
         const externalData = await externalApi.post('/mobile/trace/transaction/upsert', externalPayload);
@@ -263,9 +272,18 @@ router.post('/:id', async (req, res) => {
         const payload = req.body;
 
         console.log(`Upserting transaction with ID ${id}:`, payload);
+        console.log('Input batch_id type:', typeof payload.batch_id, 'value:', payload.batch_id);
 
         // Transform payload for external API
-        const externalPayload = transformTransactionPayload(payload);
+        let externalPayload;
+        try {
+            externalPayload = transformTransactionPayload(payload);
+            console.log('Transformed payload for external API:', JSON.stringify(externalPayload, null, 2));
+            console.log('Transformed batch_id type:', typeof externalPayload.batch_id, 'value:', externalPayload.batch_id);
+        } catch (transformError) {
+            console.error('Error during transformation:', transformError);
+            throw transformError;
+        }
         
         // Step 1: Forward to external API for upsert
         const externalData = await externalApi.post(`/mobile/trace/transaction/upsert/${id}`, externalPayload);
