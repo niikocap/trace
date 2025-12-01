@@ -1422,9 +1422,25 @@ function applyTransactionFilters() {
     const filters = transactionsPaginationState.filters;
 
     transactionsPaginationState.filteredData = allData.filter(transaction => {
-        // Filter by status
-        if (filters.status && transaction.status !== filters.status) {
+        // Skip transactions with corrupted/binary data (huge numbers indicating uninitialized memory)
+        // Check if numeric fields have unreasonable values (> 1 billion)
+        if (transaction.from_actor_id > 1000000000 || 
+            transaction.to_actor_id > 1000000000 ||
+            (transaction.quantity && parseFloat(transaction.quantity) > 1000000000) ||
+            (transaction.unit_price && parseFloat(transaction.unit_price) > 1000000000)) {
             return false;
+        }
+
+        // Filter by status (convert numeric status to string for comparison)
+        if (filters.status) {
+            let statusStr = '';
+            if (transaction.status === 0) statusStr = 'cancelled';
+            else if (transaction.status === 1) statusStr = 'completed';
+            else if (transaction.status === 2) statusStr = 'pending';
+            
+            if (statusStr !== filters.status) {
+                return false;
+            }
         }
 
         // Filter by payment method
@@ -1438,8 +1454,8 @@ function applyTransactionFilters() {
             }
         }
 
-        // Filter by date range
-        if (filters.dateFrom || filters.dateTo) {
+        // Filter by date range (skip if transaction_date is null)
+        if ((filters.dateFrom || filters.dateTo) && transaction.transaction_date) {
             const txDate = new Date(transaction.transaction_date);
             if (filters.dateFrom) {
                 const fromDate = new Date(filters.dateFrom);
